@@ -137,6 +137,11 @@
     <button id="j-btn-guardar" onclick="guardarPrediccion()">💾 Guardar mi predicción del día</button>
     <p class="hint" id="j-aviso" style="margin-top:8px;"></p>
   </div>
+  <div class="card">
+    <h2>📋 Mis pronósticos</h2>
+    <p class="hint">Escribe tu nombre arriba para ver todo lo que has marcado y cuántos puntos llevas.</p>
+    <div id="j-mis"></div>
+  </div>
 </div>
 
 <!-- ================= RANKING ================= -->
@@ -191,7 +196,15 @@
     </div>
 
     <div class="card">
-      <h2>Respaldo</h2>
+      <h2>Importar datos de la versión 1</h2>
+      <p class="hint">¿Ya tenías predicciones y resultados en la v1? Abre tu archivo viejo, dale <b>"Exportar respaldo"</b> y sube aquí ese JSON. Se subirán a la nube las predicciones, los campeones de cada quien, los resultados y los partidos cargados.</p>
+      <input type="file" id="a-v1-file" accept=".json" style="display:none" onchange="importarV1(this)">
+      <button class="sec" onclick="document.getElementById('a-v1-file').click()">⬇️ Subir respaldo de la v1</button>
+      <div id="a-v1-log" class="hint" style="margin-top:8px;"></div>
+    </div>
+
+    <div class="card">
+      <h2>Respaldo (v2)</h2>
       <button class="sec" onclick="exportarTodo()">⬆️ Exportar respaldo (JSON)</button>
     </div>
   </div>
@@ -509,6 +522,31 @@ function renderJugar(){
     document.getElementById("j-campeon-info").textContent="Elígelo solo la primera vez. Después queda bloqueado.";
   }
   document.getElementById("j-btn-guardar").disabled = false;
+  renderMis();
+}
+function renderMis(){
+  const nombre=val("j-nombre").trim();
+  const cont=document.getElementById("j-mis");
+  if(!cont) return;
+  if(!nombre){ cont.innerHTML="<span class='hint'>Escribe tu nombre para ver tus pronósticos.</span>"; return; }
+  const mp=DB.preds?.[nombre];
+  if(!mp || !Object.keys(mp).length){
+    cont.innerHTML="<span class='hint'>Aún no hay pronósticos guardados con el nombre <b>"+nombre+"</b>. (Ojo: usa siempre el mismo nombre, igualito.)</span>";
+    return;
+  }
+  let total=0, filas="";
+  for(const d of DIAS){
+    const pm=mp[d.id]; if(!pm) continue;
+    const ps=getPartidos(d.id);
+    const txt=pm.map((m,i)=> m? `${ps[i]?.[0]||"?"} <b>${m[0]}-${m[1]}</b> ${ps[i]?.[1]||"?"}`:"").filter(Boolean).join("<br>");
+    const r=puntosJornada(pm, DB.res?.[d.id]);
+    const tieneRes = DB.res?.[d.id]?.some(x=>x);
+    if(tieneRes) total+=r.pts;
+    filas+=`<tr><td>${d.et}</td><td style="font-size:.78rem">${txt}</td><td>${tieneRes? "<b>"+r.pts+"</b>" : "<span class='hint'>pendiente</span>"}</td></tr>`;
+  }
+  const camp=DB.campeones?.[nombre]||"—";
+  cont.innerHTML=`<p class="hint">🏆 Tu campeón: <b>${camp}</b> · Puntos hasta hoy: <b>${total}</b></p>`+
+    `<table><tr><th>Día</th><th>Tus marcadores</th><th>Pts</th></tr>${filas}</table>`;
 }
 async function guardarPrediccion(){
   const nombre=val("j-nombre").trim();
@@ -620,6 +658,36 @@ function exportarTodo(){
   const a=document.createElement("a"); a.href=URL.createObjectURL(blob);
   a.download="polla2026-"+POLLA_ID+"-respaldo.json"; a.click();
 }
+async function importarV1(inp){
+  const f=inp.files[0]; if(!f) return;
+  const log=document.getElementById("a-v1-log");
+  if(!sb){ log.innerHTML="<span class='warn'>Primero conecta Supabase (faltan las claves).</span>"; inp.value=""; return; }
+  log.textContent="Leyendo archivo…";
+  let data;
+  try{ data=JSON.parse(await f.text()); }catch(e){ log.innerHTML="<span class='warn'>⚠️ Archivo inválido (no es un JSON).</span>"; inp.value=""; return; }
+  let ok=0, errs=0;
+  const preds=data.preds||{}, campeones=data.campeones||{};
+  for(const nombre of Object.keys(preds)){
+    const camp=campeones[nombre]||"";
+    for(const dia of Object.keys(preds[nombre])){
+      const m=preds[nombre][dia];
+      const {error}=await sbUpsert("pred", nombre+"|"+dia, {m, c:camp});
+      if(error) errs++; else ok++;
+    }
+  }
+  for(const dia of Object.keys(data.res||{})){
+    const {error}=await sbUpsert("res", dia, data.res[dia]); if(error)errs++; else ok++;
+  }
+  for(const dia of Object.keys(data.partidos||{})){
+    const {error}=await sbUpsert("partidos", dia, data.partidos[dia]); if(error)errs++; else ok++;
+  }
+  if(data.campeonReal){ const {error}=await sbUpsert("meta","campeonReal",data.campeonReal); if(error)errs++; else ok++; }
+  inp.value="";
+  log.innerHTML = ok? `<span class='ok'>✅ Importados ${ok} registros de la v1${errs?` (${errs} con error)`:""}.</span>`
+                    : `<span class='warn'>No se encontraron datos para importar en ese archivo.</span>`;
+  await cargarTodo(false);
+  toast("Datos de la v1 importados");
+}
 
 /* ============ PUNTAJE Y RANKING ============ */
 function puntosJornada(predM, resM){
@@ -703,6 +771,9 @@ async function initAll(){
   document.getElementById("polla-id-lbl").textContent = "polla: "+POLLA_ID;
   document.getElementById("setup-banner").style.display = CONFIGURADO ? "none" : "block";
   fillSelect("j-campeon"); fillSelect("a-eq1"); fillSelect("a-eq2");
+  const inNom=document.getElementById("j-nombre");
+  inNom.addEventListener("input", ()=>{ const l=loadLocal(); l.miNombre=inNom.value.trim(); saveLocal(l); });
+  inNom.addEventListener("change", ()=>{ renderJugar(); });
   setConn(CONFIGURADO?"cargando":"off");
   renderAll();
   await cargarTodo(false);
