@@ -98,6 +98,7 @@
       <li>🔄 La organizadora ingresa los resultados al cierre del día y el <b>ranking se acumula solo</b> para todos.</li>
       <li>💰 El pozo "revienta" en cada fase eliminatoria: lo gana quien más puntos sumó <b>dentro de esa fase</b> (no el acumulado). Si hay empate, se reparte.</li>
       <li>🏆 La primera vez que predices eliges tu <b>campeón del mundo</b> (vale 10 pts al final, no se puede cambiar).</li>
+      <li>🔒 Los días que <b>ya pasaron quedan cerrados</b>: no se pueden predecir ni editar (para que nadie apueste viendo resultados). Predice el día de hoy o los próximos.</li>
     </ul>
   </div>
   <div class="card">
@@ -403,6 +404,12 @@ function jornadaActual(){
   for(const j of DIAS){ if(h<=j.fecha) return j.id; }
   return DIAS[DIAS.length-1].id;
 }
+/* Un día queda CERRADO para predecir si su fecha ya pasó (antes de hoy).
+   Hoy y los días futuros siguen abiertos. El admin NO se ve afectado. */
+function diaCerrado(jid){
+  const j=DIAS.find(d=>d.id===jid); if(!j) return false;
+  return j.fecha < hoyStr();
+}
 
 /* ============ SUPABASE: capa de datos ============
    Tabla polla_kv(polla_id, scope, clave, valor jsonb)  PK(polla_id,scope,clave)
@@ -455,13 +462,15 @@ function setConn(estado){
 /* ============ UI BUILD ============ */
 let jSel=jornadaActual(), aSel=jornadaActual();
 
-function renderJornBtns(containerId, sel, onpick){
+function renderJornBtns(containerId, sel, onpick, lockPast){
   const act=jornadaActual();
-  document.getElementById(containerId).innerHTML = DIAS.map(j=>`
-    <div class="jorn-btn ${j.id===sel?'activa':''} ${j.id===act?'hoy':''}" onclick="${onpick}('${j.id}')">
+  document.getElementById(containerId).innerHTML = DIAS.map(j=>{
+    const cerrado = lockPast && diaCerrado(j.id);
+    return `
+    <div class="jorn-btn ${j.id===sel?'activa':''} ${j.id===act?'hoy':''}" style="${cerrado?'opacity:.55;':''}" onclick="${onpick}('${j.id}')">
       <b>${j.et}</b><span style="font-size:.66rem">${nombreFase(j.fase)}</span>
-      ${j.id===act?'<br><span class="badge-hoy">HOY</span>':''}
-    </div>`).join("");
+      ${j.id===act?'<br><span class="badge-hoy">HOY</span>':cerrado?'<br><span style="font-size:.66rem">🔒 cerrado</span>':''}
+    </div>`;}).join("");
 }
 function pickJ(jid){ jSel=jid; renderJugar(); }
 function pickA(jid){ aSel=jid; renderAdminJornada(); }
@@ -494,9 +503,12 @@ function setv(id,v){const e=document.getElementById(id); if(e)e.value=v;}
 
 /* ============ PESTAÑA PREDECIR ============ */
 function renderJugar(){
-  renderJornBtns("j-jornadas", jSel, "pickJ");
+  renderJornBtns("j-jornadas", jSel, "pickJ", true);
   const j=DIAS.find(x=>x.id===jSel);
-  document.getElementById("j-jorn-info").innerHTML=`<b>${j.et} · ${nombreFase(j.fase)}</b>. Predice el marcador en 90 minutos.`;
+  const cerrado=diaCerrado(jSel);
+  document.getElementById("j-jorn-info").innerHTML = cerrado
+    ? `<b>${j.et} · ${nombreFase(j.fase)}</b>. <span style="color:var(--bad)">🔒 Día cerrado: ya pasó, no se puede predecir ni editar.</span>`
+    : `<b>${j.et} · ${nombreFase(j.fase)}</b>. Predice el marcador en 90 minutos.`;
   const n=renderPartidosForm("j", jSel, document.getElementById("j-partidos"));
   document.getElementById("j-sin-partidos").style.display = n? "none":"block";
 
@@ -521,7 +533,16 @@ function renderJugar(){
     if(local.miCampeon) sel.value=local.miCampeon;
     document.getElementById("j-campeon-info").textContent="Elígelo solo la primera vez. Después queda bloqueado.";
   }
-  document.getElementById("j-btn-guardar").disabled = false;
+  // Bloquear inputs y botón si el día ya cerró
+  document.querySelectorAll("#j-partidos input").forEach(el=>el.disabled=cerrado);
+  document.getElementById("j-btn-guardar").disabled = cerrado;
+  if(cerrado){
+    document.getElementById("j-aviso").innerHTML = guardadas
+      ? "<span class='hint'>🔒 Este día ya cerró. Así quedó tu pronóstico (no editable).</span>"
+      : "<span class='hint'>🔒 Este día ya cerró. No registraste pronóstico a tiempo.</span>";
+  } else {
+    document.getElementById("j-aviso").textContent = "";
+  }
   renderMis();
 }
 function renderMis(){
@@ -551,6 +572,7 @@ function renderMis(){
 async function guardarPrediccion(){
   const nombre=val("j-nombre").trim();
   const aviso=document.getElementById("j-aviso");
+  if(diaCerrado(jSel)){ aviso.innerHTML="<span class='warn'>🔒 Este día ya cerró, no se puede guardar.</span>"; return; }
   const ps=getPartidos(jSel);
   const m=leerMarcadores("j",ps.length);
   const errs=[];
