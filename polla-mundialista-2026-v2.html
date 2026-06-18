@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>⚽ Polla Mundialista 2026 — v2 en la nube</title>
+<title>⚽ Polla Mundialista 2026 — v3 en la nube</title>
 <style>
   :root{
     --bg:#0d1321; --card:#1d2d44; --card2:#16243a; --accent:#f4d35e; --accent2:#3e92cc;
@@ -90,25 +90,29 @@
 <!-- ================= REGLAS ================= -->
 <div class="panel active" id="p-reglas">
   <div class="card">
-    <h2>Cómo funciona (v2)</h2>
+    <h2>Cómo funciona (v3)</h2>
     <ul class="reglas">
       <li>🌐 Todos entran al <b>mismo link</b> y marcan sus predicciones directo. Ya <b>no hay que mandar códigos</b> por WhatsApp.</li>
       <li>📅 Se apuesta <b>cada día</b> que hay partidos. La web detecta sola el día de hoy.</li>
       <li>✏️ Entras a <b>Predecir</b>, escribes tu nombre (siempre el mismo), llenas los marcadores del día y le das <b>Guardar</b>. Listo, queda en la nube.</li>
-      <li>🔄 La organizadora ingresa los resultados al cierre del día y el <b>ranking se acumula solo</b> para todos.</li>
+      <li>⏱️ <b>Puedes cambiar tu predicción hasta 5 minutos después de que arranca cada partido.</b> Pasado ese momento, ese partido se cierra solo (los demás del día siguen abiertos hasta su propia hora).</li>
+      <li>🗓️ Los días de grupos se agrupan en <b>Fechas</b> (Fecha 1: 11–17 jun · Fecha 2: 18–23 jun · Fecha 3: 24–27 jun). Hay un <b>ganador por Fecha</b> (quien más puntos hizo dentro de esa Fecha).</li>
+      <li>🔄 La organizadora ingresa los resultados y el <b>ranking se acumula solo</b> para todos.</li>
       <li>💰 El pozo "revienta" en cada fase eliminatoria: lo gana quien más puntos sumó <b>dentro de esa fase</b> (no el acumulado). Si hay empate, se reparte.</li>
       <li>🏆 La primera vez que predices eliges tu <b>campeón del mundo</b> (vale 10 pts al final, no se puede cambiar).</li>
-      <li>🔒 Los días que <b>ya pasaron quedan cerrados</b>: no se pueden predecir ni editar (para que nadie apueste viendo resultados). Predice el día de hoy o los próximos.</li>
     </ul>
   </div>
   <div class="card">
     <h2>Puntaje</h2>
+    <p class="hint" style="margin-bottom:6px;"><b>Desde la Fecha 2 (18 jun)</b> rige este sistema. Solo cuenta el de mayor valor que apliques:</p>
     <ul class="reglas">
-      <li><span class="badge-pts">3 pts</span> Marcador exacto.</li>
-      <li><span class="badge-pts">1 pt</span> Acertar ganador o empate (sin marcador exacto).</li>
+      <li><span class="badge-pts">5 pts</span> Marcador exacto (ej. predices 2-0 y queda 2-0).</li>
+      <li><span class="badge-pts">3 pts</span> Diferencia de goles correcta (ej. predices 3-1 y queda 2-0: ambos +2). Un empate con otro marcador, p.ej. 1-1 vs 0-0, también cuenta aquí (diferencia 0).</li>
+      <li><span class="badge-pts">2 pts</span> Solo aciertas el ganador o el empate (sin acertar la diferencia).</li>
+      <li><span class="badge-pts">0 pts</span> No aciertas ni ganador ni empate.</li>
       <li><span class="badge-pts">10 pts</span> Campeón del mundo (se paga al final).</li>
     </ul>
-    <p class="hint" style="margin-top:8px;">En eliminatorias cuenta el resultado en 90' (el empate vale aunque haya penales). Desempate del ranking: más marcadores exactos; luego, quien acertó al campeón.</p>
+    <p class="hint" style="margin-top:8px;">📌 La <b>Fecha 1</b> (11–17 jun) ya cerró con su sistema original (3 pts exacto · 1 pt ganador) y su ganador quedó definido; no se recalcula. En eliminatorias cuenta el resultado en 90' (el empate vale aunque haya penales). Desempate del ranking: más marcadores exactos; luego, quien acertó al campeón.</p>
   </div>
   <div class="card">
     <h2>Calendario día por día</h2>
@@ -177,7 +181,9 @@
       <h2>Jornadas: partidos y resultados</h2>
       <div class="jorn-grid" id="a-jornadas"></div>
       <p class="hint" id="a-jorn-info"></p>
+      <p class="hint" style="margin-top:4px;">⏰ La casilla <b>HH:MM</b> de cada partido es su <b>hora de inicio</b> (huso del torneo). Cada predicción se cierra sola <b>5 min después</b> de esa hora. Déjala vacía si aún no la sabes.</p>
       <div id="a-partidos"></div>
+      <button class="sec" onclick="guardarHorarios()" style="margin-top:10px;">⏰ Guardar horarios de esta jornada</button>
       <details style="margin-top:10px;"><summary>➕ Agregar / editar partidos de esta jornada</summary>
         <div class="flexrow" style="margin-top:8px;">
           <div><label>Equipo local</label><select id="a-eq1"></select></div>
@@ -254,7 +260,21 @@ const GRUPOS = {
   L:["Inglaterra","Croacia","Ghana","Panamá"]
 };
 const TODOS = Object.values(GRUPOS).flat().sort((a,b)=>a.localeCompare(b));
-const PTS = {exacto:3, resultado:1, campeon:10};
+
+/* ====== PUNTAJE ======
+   Fecha 1 (hasta el 17-jun) conserva el sistema viejo 3/1.
+   Desde la Fecha 2 (18-jun en adelante) rige el sistema nuevo 5/3/2/0. */
+const CAMBIO_PUNTAJE = "2026-06-18";                       // desde aquí rige 5/3/2/0
+const PTS_VIEJO = {exacto:3, resultado:1, campeon:10};
+const PTS_NUEVO = {exacto:5, diferencia:3, resultado:2, campeon:10};
+const PTS = PTS_NUEVO;                                      // campeon=10 (común a ambos)
+function ptsDe(fecha){ return (fecha && fecha >= CAMBIO_PUNTAJE) ? PTS_NUEVO : PTS_VIEJO; }
+
+/* ====== ZONA HORARIA DEL TORNEO ======
+   Se usa para cerrar cada partido 5 min después del pitazo inicial.
+   Por defecto Colombia/Perú (UTC-5). Cambia este valor si tu huso es otro. */
+const TZ = "-05:00";
+const GRACIA_MIN = 5;                                       // minutos de gracia tras el pitazo
 
 const FASES = [
   {id:"GR", nombre:"Fase de grupos",   pozo:false},
@@ -263,6 +283,14 @@ const FASES = [
   {id:"QF", nombre:"Cuartos",          pozo:true},
   {id:"SF", nombre:"Semis y Final",    pozo:true}
 ];
+
+/* ====== FECHAS (rondas) de la fase de grupos, con ganador por Fecha ====== */
+const FECHAS = [
+  {id:"F1", nombre:"Fecha 1", rango:"11–17 jun", dias:["D11","D12","D13","D14","D15","D16","D17"]},
+  {id:"F2", nombre:"Fecha 2", rango:"18–23 jun", dias:["D18","D19","D20","D21","D22","D23"]},
+  {id:"F3", nombre:"Fecha 3", rango:"24–27 jun", dias:["D24","D25","D26","D27"]}
+];
+function fechaDeDia(did){ return FECHAS.find(f=>f.dias.includes(did)); }
 
 const DIAS = [
   {id:"D11", fase:"GR", fecha:"2026-06-11", et:"Jue 11 jun", partidos:[
@@ -384,7 +412,7 @@ function nombreFase(fid){ return FASES.find(f=>f.id===fid)?.nombre||fid; }
      campeonReal: "País"
    }
 ============================================================ */
-let DB = {partidos:{}, res:{}, preds:{}, campeones:{}, campeonReal:""};
+let DB = {partidos:{}, res:{}, preds:{}, campeones:{}, campeonReal:"", horas:{}};
 let cargando = false;
 
 /* localStorage solo para mi borrador / mi nombre local */
@@ -395,6 +423,30 @@ function saveLocal(s){ localStorage.setItem(LSK, JSON.stringify(s)); }
 function getPartidos(jid){
   if(DB.partidos?.[jid]?.length) return DB.partidos[jid];
   return DIAS.find(j=>j.id===jid).partidos;
+}
+function getHoras(jid){ return DB.horas?.[jid] || []; }
+
+/* ====== CIERRE POR PARTIDO (5 min después del pitazo) ======
+   La hora de cada partido la carga la organizadora en Admin (formato HH:MM,
+   en la zona horaria TZ del torneo). Sin hora cargada, el partido NO se cierra
+   por reloj y cae a la regla de día (ver diaCerrado). */
+function kickoffMs(diaFecha, horaHHMM){
+  if(!horaHHMM || !/^\d{1,2}:\d{2}$/.test(horaHHMM)) return null;
+  const hh = horaHHMM.length===4 ? "0"+horaHHMM : horaHHMM;
+  const t = new Date(`${diaFecha}T${hh}:00${TZ}`).getTime();
+  return isNaN(t) ? null : t;
+}
+/* ¿El partido i del día jid está cerrado para editar? */
+function partidoCerrado(jid, i){
+  const j = DIAS.find(d=>d.id===jid); if(!j) return false;
+  const hora = getHoras(jid)[i];
+  const k = kickoffMs(j.fecha, hora);
+  if(k!==null) return Date.now() >= k + GRACIA_MIN*60000;  // 5 min de gracia
+  return diaCerrado(jid);                                  // sin hora: regla de día
+}
+function horaInicioTxt(jid, i){
+  const hora = getHoras(jid)[i];
+  return (hora && /^\d{1,2}:\d{2}$/.test(hora)) ? hora : "";
 }
 
 /* ============ DÍA ACTUAL ============ */
@@ -427,15 +479,16 @@ async function sbDelete(scope, clave){
   await sb.from("polla_kv").delete().match({polla_id:POLLA_ID, scope, clave});
 }
 async function cargarTodo(avisar){
-  if(!sb){ DB = Object.assign({partidos:{},res:{},preds:{},campeones:{},campeonReal:""}, loadLocal().DB||{}); renderAll(); return; }
+  if(!sb){ DB = Object.assign({partidos:{},res:{},preds:{},campeones:{},campeonReal:"",horas:{}}, loadLocal().DB||{}); renderAll(); return; }
   cargando = true; setConn("cargando");
   const {data, error} = await sb.from("polla_kv").select("scope,clave,valor").eq("polla_id", POLLA_ID);
   cargando = false;
   if(error){ setConn("error"); if(avisar) toast("No se pudo leer la nube",true); console.error(error); return; }
-  const nuevo = {partidos:{}, res:{}, preds:{}, campeones:{}, campeonReal:""};
+  const nuevo = {partidos:{}, res:{}, preds:{}, campeones:{}, campeonReal:"", horas:{}};
   for(const row of (data||[])){
     if(row.scope==="partidos") nuevo.partidos[row.clave]=row.valor;
     else if(row.scope==="res") nuevo.res[row.clave]=row.valor;
+    else if(row.scope==="hora") nuevo.horas[row.clave]=row.valor;
     else if(row.scope==="meta" && row.clave==="campeonReal") nuevo.campeonReal=row.valor||"";
     else if(row.scope==="pred"){
       // clave = "nombre|dia"
@@ -475,19 +528,39 @@ function renderJornBtns(containerId, sel, onpick, lockPast){
 function pickJ(jid){ jSel=jid; renderJugar(); }
 function pickA(jid){ aSel=jid; renderAdminJornada(); }
 
+function horaMas(hhmm, mins){
+  const [h,m]=hhmm.split(":").map(Number);
+  let tot=h*60+m+mins; tot=((tot%1440)+1440)%1440;
+  return String(Math.floor(tot/60)).padStart(2,"0")+":"+String(tot%60).padStart(2,"0");
+}
 function renderPartidosForm(prefix, jid, container){
   const ps=getPartidos(jid);
   if(!ps.length){ container.innerHTML=""; return 0; }
-  container.innerHTML = ps.map((p,i)=>`
+  const horas=getHoras(jid);
+  container.innerHTML = ps.map((p,i)=>{
+    const hora=horas[i]||"";
+    const cerrado = prefix==="j" && partidoCerrado(jid,i);
+    let cierreTxt="";
+    if(prefix==="j"){
+      if(hora){
+        cierreTxt = cerrado ? `🔒 cerrado (inició ${hora})`
+                            : `⏰ inicia ${hora} · editable hasta ${horaMas(hora,GRACIA_MIN)}`;
+      } else if(cerrado){ cierreTxt="🔒 cerrado"; }
+    }
+    const adminHora = prefix==="a"
+      ? `<input type="text" id="a-h${i}" value="${hora}" placeholder="HH:MM" style="width:62px;text-align:center" maxlength="5" title="Hora de inicio (${TZ})">`
+      : "";
+    return `
     <div class="partido">
-      <div class="nombre">${p[0]} 🆚 ${p[1]}<span class="fecha">${p[2]||""}</span></div>
+      <div class="nombre">${p[0]} 🆚 ${p[1]}<span class="fecha">${p[2]||""}${cierreTxt?` · ${cierreTxt}`:""}</span></div>
       <div class="marcador">
-        <input type="number" min="0" max="20" id="${prefix}-m${i}a" placeholder="-">
+        ${adminHora}
+        <input type="number" min="0" max="20" id="${prefix}-m${i}a" placeholder="-" ${cerrado?"disabled":""}>
         <span>—</span>
-        <input type="number" min="0" max="20" id="${prefix}-m${i}b" placeholder="-">
+        <input type="number" min="0" max="20" id="${prefix}-m${i}b" placeholder="-" ${cerrado?"disabled":""}>
         ${prefix==="a"?`<button class="mini danger" onclick="quitarPartido(${i})">✕</button>`:""}
       </div>
-    </div>`).join("");
+    </div>`;}).join("");
   return ps.length;
 }
 function leerMarcadores(prefix, n){
@@ -505,10 +578,13 @@ function setv(id,v){const e=document.getElementById(id); if(e)e.value=v;}
 function renderJugar(){
   renderJornBtns("j-jornadas", jSel, "pickJ", true);
   const j=DIAS.find(x=>x.id===jSel);
-  const cerrado=diaCerrado(jSel);
-  document.getElementById("j-jorn-info").innerHTML = cerrado
-    ? `<b>${j.et} · ${nombreFase(j.fase)}</b>. <span style="color:var(--bad)">🔒 Día cerrado: ya pasó, no se puede predecir ni editar.</span>`
-    : `<b>${j.et} · ${nombreFase(j.fase)}</b>. Predice el marcador en 90 minutos.`;
+  const ps=getPartidos(jSel);
+  const locks=ps.map((_,i)=>partidoCerrado(jSel,i));
+  const todosCerrados = ps.length>0 && locks.every(Boolean);
+  const algunoCerrado = locks.some(Boolean);
+  document.getElementById("j-jorn-info").innerHTML = todosCerrados
+    ? `<b>${j.et} · ${nombreFase(j.fase)}</b>. <span style="color:var(--bad)">🔒 Todos los partidos de este día ya cerraron: no se puede editar.</span>`
+    : `<b>${j.et} · ${nombreFase(j.fase)}</b>. Predice el marcador en 90 min. Cada partido se cierra <b>${GRACIA_MIN} min después de su pitazo</b>.${algunoCerrado?' <span style="color:var(--bad)">Algunos partidos ya cerraron.</span>':''}`;
   const n=renderPartidosForm("j", jSel, document.getElementById("j-partidos"));
   document.getElementById("j-sin-partidos").style.display = n? "none":"block";
 
@@ -533,10 +609,9 @@ function renderJugar(){
     if(local.miCampeon) sel.value=local.miCampeon;
     document.getElementById("j-campeon-info").textContent="Elígelo solo la primera vez. Después queda bloqueado.";
   }
-  // Bloquear inputs y botón si el día ya cerró
-  document.querySelectorAll("#j-partidos input").forEach(el=>el.disabled=cerrado);
-  document.getElementById("j-btn-guardar").disabled = cerrado;
-  if(cerrado){
+  // El botón se desactiva solo si no queda nada editable
+  document.getElementById("j-btn-guardar").disabled = (n===0 || todosCerrados);
+  if(todosCerrados){
     document.getElementById("j-aviso").innerHTML = guardadas
       ? "<span class='hint'>🔒 Este día ya cerró. Así quedó tu pronóstico (no editable).</span>"
       : "<span class='hint'>🔒 Este día ya cerró. No registraste pronóstico a tiempo.</span>";
@@ -560,7 +635,7 @@ function renderMis(){
     const pm=mp[d.id]; if(!pm) continue;
     const ps=getPartidos(d.id);
     const txt=pm.map((m,i)=> m? `${ps[i]?.[0]||"?"} <b>${m[0]}-${m[1]}</b> ${ps[i]?.[1]||"?"}`:"").filter(Boolean).join("<br>");
-    const r=puntosJornada(pm, DB.res?.[d.id]);
+    const r=puntosJornada(pm, DB.res?.[d.id], d.fecha);
     const tieneRes = DB.res?.[d.id]?.some(x=>x);
     if(tieneRes) total+=r.pts;
     filas+=`<tr><td>${d.et}</td><td style="font-size:.78rem">${txt}</td><td>${tieneRes? "<b>"+r.pts+"</b>" : "<span class='hint'>pendiente</span>"}</td></tr>`;
@@ -572,13 +647,17 @@ function renderMis(){
 async function guardarPrediccion(){
   const nombre=val("j-nombre").trim();
   const aviso=document.getElementById("j-aviso");
-  if(diaCerrado(jSel)){ aviso.innerHTML="<span class='warn'>🔒 Este día ya cerró, no se puede guardar.</span>"; return; }
   const ps=getPartidos(jSel);
-  const m=leerMarcadores("j",ps.length);
+  const locks=ps.map((_,i)=>partidoCerrado(jSel,i));
+  if(ps.length && locks.every(Boolean)){ aviso.innerHTML="<span class='warn'>🔒 Todos los partidos de este día ya cerraron, no se puede guardar.</span>"; return; }
+  const prev=(nombre && DB.preds?.[nombre]?.[jSel]) || [];
+  const form=leerMarcadores("j",ps.length);
+  // mezcla: los partidos ya cerrados conservan lo guardado; los abiertos toman el formulario
+  const m=ps.map((_,i)=> locks[i] ? (prev[i]||null) : form[i]);
   const errs=[];
   if(!nombre) errs.push("Falta tu nombre.");
   if(!ps.length) errs.push("Esta jornada no tiene partidos cargados.");
-  m.forEach((x,i)=>{ if(!x) errs.push("Falta marcador: "+ps[i][0]+" vs "+ps[i][1]); });
+  ps.forEach((p,i)=>{ if(!locks[i] && !m[i]) errs.push("Falta marcador: "+p[0]+" vs "+p[1]); });
   const yaTeniaCamp = nombre && DB.campeones?.[nombre];
   const campElegido = yaTeniaCamp || val("j-campeon");
   if(!campElegido) errs.push("Elige tu campeón del mundo.");
@@ -641,6 +720,7 @@ async function quitarPartido(i){
   const ps=getPartidos(aSel).slice(); ps.splice(i,1);
   DB.partidos[aSel]=ps;
   if(DB.res?.[aSel]){ DB.res[aSel].splice(i,1); await sbUpsert("res", aSel, DB.res[aSel]); }
+  if(DB.horas?.[aSel]){ DB.horas[aSel].splice(i,1); await sbUpsert("hora", aSel, DB.horas[aSel]); }
   await sbUpsert("partidos", aSel, ps);
   renderAdminJornada();
 }
@@ -651,6 +731,22 @@ async function guardarResultados(){
   const {error}=await sbUpsert("res", aSel, m);
   if(error){ toast("No se pudo guardar",true); return; }
   toast("Resultados de "+j_etiqueta(aSel)+" guardados"); renderRanking();
+}
+async function guardarHorarios(){
+  const ps=getPartidos(aSel);
+  if(!ps.length){ toast("No hay partidos en este día",true); return; }
+  const horas=[]; let malo="";
+  for(let i=0;i<ps.length;i++){
+    let h=(val("a-h"+i)||"").trim();
+    if(h && !/^\d{1,2}:\d{2}$/.test(h)) malo=h;
+    if(h && h.length===4) h="0"+h;       // 9:05 -> 09:05
+    horas.push(h||null);
+  }
+  if(malo){ toast("Hora inválida: "+malo+" (usa HH:MM)",true); return; }
+  DB.horas[aSel]=horas;
+  const {error}=await sbUpsert("hora", aSel, horas);
+  if(error){ toast("No se pudo guardar los horarios",true); return; }
+  toast("Horarios de "+j_etiqueta(aSel)+" guardados ("+TZ+")"); renderAdminJornada();
 }
 async function guardarCampeon(){
   DB.campeonReal=val("a-campeon");
@@ -711,16 +807,32 @@ async function importarV1(inp){
   toast("Datos de la v1 importados");
 }
 
-/* ============ PUNTAJE Y RANKING ============ */
-function puntosJornada(predM, resM){
+/* ============ PUNTAJE Y RANKING ============
+   Puntaje jerárquico (solo se aplica el de mayor valor que aplique):
+   Fecha 1  (hasta 17-jun):  3 exacto · 1 ganador/empate
+   Fecha 2+ (desde 18-jun):  5 exacto · 3 diferencia de goles · 2 ganador/empate
+   La "diferencia" usa la resta con signo (local−visita): predecir 3-1 y que
+   quede 2-0 son ambos +2 → cuenta. Un empate con marcador distinto (p.ej.
+   1-1 vs 0-0) también es "diferencia correcta" porque la resta es 0 en ambos. */
+function puntosJornada(predM, resM, fecha){
+  const P = ptsDe(fecha);
   let pts=0, ex=0;
   (resM||[]).forEach((rm,i)=>{
     const pm=predM?.[i];
     if(!rm||!pm) return;
-    if(pm[0]===rm[0]&&pm[1]===rm[1]){ pts+=PTS.exacto; ex++; }
-    else if(Math.sign(pm[0]-pm[1])===Math.sign(rm[0]-rm[1])) pts+=PTS.resultado;
+    if(pm[0]===rm[0] && pm[1]===rm[1]){ pts+=P.exacto; ex++; }
+    else if(P.diferencia!==undefined && (pm[0]-pm[1])===(rm[0]-rm[1])){ pts+=P.diferencia; }
+    else if(Math.sign(pm[0]-pm[1])===Math.sign(rm[0]-rm[1])){ pts+=P.resultado; }
   });
   return {pts,ex};
+}
+/* Ganador(es) de una Fecha (ronda de grupos), a partir de las filas ya calculadas */
+function ganadoresDeFecha(fechaObj, filas, res){
+  const hayRes = fechaObj.dias.some(d=>res[d]?.some(x=>x));
+  if(!hayRes) return null;
+  const maxP = Math.max(...filas.map(p=>p.porFecha[fechaObj.id]||0));
+  if(!(maxP>0)) return {ganadores:[], pts:0};
+  return {ganadores: filas.filter(p=>(p.porFecha[fechaObj.id]||0)===maxP).map(p=>p.n), pts:maxP};
 }
 function renderRanking(){
   const preds=DB.preds||{}, res=DB.res||{};
@@ -728,21 +840,45 @@ function renderRanking(){
   const names=Object.keys(preds);
   if(!names.length){ tabla.innerHTML="<p class='hint'>Aún no hay predicciones. Cuando la gente marque, aparece aquí.</p>"; porJ.innerHTML=""; return; }
   const filas=names.map(n=>{
-    let tot=0, ex=0; const porFase={};
+    let tot=0, ex=0; const porFase={}, porFecha={};
     for(const f of FASES) porFase[f.id]=0;
+    for(const f of FECHAS) porFecha[f.id]=0;
     for(const d of DIAS){
-      const r=puntosJornada(preds[n][d.id], res[d.id]);
+      const r=puntosJornada(preds[n][d.id], res[d.id], d.fecha);
       tot+=r.pts; ex+=r.ex; porFase[d.fase]+=r.pts;
+      const fe=fechaDeDia(d.id); if(fe) porFecha[fe.id]+=r.pts;
     }
     let bonus=0;
     if(DB.campeonReal && DB.campeones?.[n]===DB.campeonReal){ bonus=PTS.campeon; tot+=bonus; }
-    return {n, tot, ex, porFase, bonus, camp:DB.campeones?.[n]||"—"};
+    return {n, tot, ex, porFase, porFecha, bonus, camp:DB.campeones?.[n]||"—"};
   }).sort((a,b)=> b.tot-a.tot || b.ex-a.ex || (b.bonus-a.bonus));
 
-  tabla.innerHTML="<table><tr><th>#</th><th>Participante</th><th>Total</th><th>Exactos</th><th>Su campeón</th></tr>"+
+  // 🎉 Banner: felicitación al ganador de la Fecha 1
+  const f1 = ganadoresDeFecha(FECHAS[0], filas, res);
+  let bannerHTML="";
+  if(f1 && f1.ganadores.length){
+    const lista = f1.ganadores.join(" y ");
+    const emp = f1.ganadores.length>1;
+    bannerHTML = `<div style="background:linear-gradient(135deg,#f4d35e,#e0a800);color:#0d1321;border-radius:12px;padding:14px 16px;margin-bottom:14px;text-align:center;font-weight:700;">
+      🎉 ¡Felicidades <span style="font-size:1.1rem">${lista}</span>${emp?" (empate)":""}! 🏆<br>
+      <span style="font-weight:600;font-size:.85rem">Ganador${emp?"es":""} de la <b>Fecha 1</b> con ${f1.pts} pts.</span>
+    </div>`;
+  }
+
+  tabla.innerHTML=bannerHTML+"<table><tr><th>#</th><th>Participante</th><th>Total</th><th>Exactos</th><th>Su campeón</th></tr>"+
     filas.map((f,i)=>`<tr class="${i===0?'pos1':''}"><td>${i===0?"🥇":i===1?"🥈":i===2?"🥉":i+1}</td><td>${f.n}</td><td><b>${f.tot}</b></td><td>${f.ex}</td><td>${f.camp}${f.bonus?" <span class='badge-pts'>+10</span>":""}</td></tr>`).join("")+"</table>";
 
-  let pozosHTML="<table><tr><th>Fase (pozo)</th><th>Ganador</th><th>Pts en la fase</th></tr>";
+  // Ganadores por Fecha (rondas de grupos)
+  let fechasHTML="<h2 style='font-size:1rem;color:var(--accent);margin-bottom:4px;'>🗓️ Ganadores por Fecha</h2><table><tr><th>Fecha</th><th>Ganador</th><th>Pts</th></tr>";
+  for(const fe of FECHAS){
+    const g=ganadoresDeFecha(fe, filas, res);
+    if(!g){ fechasHTML+=`<tr><td>${fe.nombre} <span class="hint">(${fe.rango})</span></td><td colspan="2" class="hint">sin resultados aún</td></tr>`; continue; }
+    const txt = g.ganadores.length ? g.ganadores.join(", ")+(g.ganadores.length>1?" (empate)":"") : "—";
+    fechasHTML+=`<tr class="${g.ganadores.length?'pos1':''}"><td><b>${fe.nombre}</b> <span class="hint">(${fe.rango})</span></td><td>${txt}</td><td><b>${g.pts||0}</b></td></tr>`;
+  }
+  fechasHTML+="</table>";
+
+  let pozosHTML="<h2 style='font-size:1rem;color:var(--accent);margin:16px 0 4px;'>💰 Pozos por fase eliminatoria</h2><table><tr><th>Fase (pozo)</th><th>Ganador</th><th>Pts en la fase</th></tr>";
   for(const f of FASES.filter(x=>x.pozo)){
     const diasFase=DIAS.filter(d=>d.fase===f.id);
     const hayRes=diasFase.some(d=>res[d.id]?.some(x=>x));
@@ -759,7 +895,7 @@ function renderRanking(){
     filas.map(f=>`<tr><td>${f.n}</td>${FASES.map(fa=>`<td>${f.porFase[fa.id]}</td>`).join("")}<td><b>${f.tot-f.bonus}</b></td></tr>`).join("")+
     "</table></details>";
 
-  porJ.innerHTML=pozosHTML+detHTML;
+  porJ.innerHTML=fechasHTML+pozosHTML+detHTML;
 }
 
 /* ============ INIT ============ */
