@@ -74,6 +74,7 @@
   <div class="tabs">
     <div class="tab active" data-p="reglas">📜 Reglas</div>
     <div class="tab" data-p="jugar">✏️ Predecir</div>
+    <div class="tab" data-p="resultados">👁️ Resultados</div>
     <div class="tab" data-p="ranking">🏆 Ranking</div>
     <div class="tab" data-p="admin">🔑 Admin</div>
   </div>
@@ -93,11 +94,14 @@
     <h2>Cómo funciona (v3)</h2>
     <ul class="reglas">
       <li>🌐 Todos entran al <b>mismo link</b> y marcan sus predicciones directo. Ya <b>no hay que mandar códigos</b> por WhatsApp.</li>
+      <li>🔑 Ahora cada quien entra con <b>su nombre y su contraseña</b>. La organizadora te asigna la clave; si no la tienes, pídesela. Tu sesión queda guardada en tu equipo.</li>
       <li>📅 Se apuesta <b>cada día</b> que hay partidos. La web detecta sola el día de hoy.</li>
-      <li>✏️ Entras a <b>Predecir</b>, escribes tu nombre (siempre el mismo), llenas los marcadores del día y le das <b>Guardar</b>. Listo, queda en la nube.</li>
+      <li>✏️ Entras a <b>Predecir</b>, llenas los marcadores del día y le das <b>Guardar</b>. Listo, queda en la nube.</li>
       <li>⏱️ <b>Puedes cambiar tu predicción hasta 5 minutos después de que arranca cada partido.</b> Pasado ese momento, ese partido se cierra solo (los demás del día siguen abiertos hasta su propia hora).</li>
+      <li>👁️ En <b>Resultados</b> puedes ver los pronósticos de los demás, pero <b>solo de los partidos que ya cerraron</b>. Mientras un partido sigue abierto, nadie ve lo que apostaron los otros.</li>
       <li>🗓️ Los días de grupos se agrupan en <b>Fechas</b> (Fecha 1: 11–17 jun · Fecha 2: 18–23 jun · Fecha 3: 24–27 jun). Hay un <b>ganador por Fecha</b> (quien más puntos hizo dentro de esa Fecha).</li>
-      <li>🔄 La organizadora ingresa los resultados y el <b>ranking se acumula solo</b> para todos.</li>
+      <li>🏆 En <b>Ranking</b> verás el <b>acumulado general</b> de todo el torneo y también el <b>ranking por Fecha</b> (cada Fecha cuenta aparte, desde 0).</li>
+      <li>🔄 La organizadora ingresa los resultados y los puntajes <b>se calculan solos</b> para todos.</li>
       <li>💰 El pozo "revienta" en cada fase eliminatoria: lo gana quien más puntos sumó <b>dentro de esa fase</b> (no el acumulado). Si hay empate, se reparte.</li>
       <li>🏆 La primera vez que predices eliges tu <b>campeón del mundo</b> (vale 10 pts al final, no se puede cambiar).</li>
     </ul>
@@ -122,38 +126,78 @@
 
 <!-- ================= PREDECIR ================= -->
 <div class="panel" id="p-jugar">
-  <div class="card">
-    <h2>Tus datos</h2>
-    <label>Tu nombre (usa siempre el mismo)</label>
-    <input type="text" id="j-nombre" placeholder="Ej: Angella" maxlength="20">
-    <label>🏆 Tu campeón del mundo (solo la primera vez)</label>
-    <select id="j-campeon"></select>
-    <p class="hint" id="j-campeon-info" style="margin-top:6px;"></p>
+
+  <!-- Login del participante -->
+  <div class="card" id="j-login-card">
+    <h2>🔑 Ingresar</h2>
+    <p class="hint">Escribe tu nombre y tu contraseña para predecir. Si todavía no tienes contraseña, pídesela a la organizadora.</p>
+    <label>Tu nombre</label>
+    <input type="text" id="j-login-nombre" placeholder="Ej: Angella" maxlength="20" autocomplete="username">
+    <label>Contraseña</label>
+    <input type="password" id="j-login-pass" placeholder="••••" autocomplete="current-password">
+    <button onclick="loginParticipante()">Entrar</button>
+    <p class="warn" id="j-login-msg" style="margin-top:8px;"></p>
   </div>
-  <div class="card">
-    <h2>Elige el día</h2>
-    <div class="jorn-grid" id="j-jornadas"></div>
-    <p class="hint" id="j-jorn-info"></p>
-    <div id="j-partidos"></div>
-    <p class="hint" id="j-sin-partidos" style="display:none;">Este día aún no tiene partidos cargados (eliminatorias: los cruces se conocen al cerrar la fase anterior). La organizadora los carga desde Admin y aparecerán solos aquí.</p>
+
+  <!-- Zona visible solo tras iniciar sesión -->
+  <div id="j-zona" style="display:none;">
+    <div class="card">
+      <h2>Tu cuenta</h2>
+      <p class="hint" id="j-saludo"></p>
+      <label>🏆 Tu campeón del mundo (solo la primera vez)</label>
+      <select id="j-campeon"></select>
+      <p class="hint" id="j-campeon-info" style="margin-top:6px;"></p>
+      <button class="mini sec" onclick="logoutParticipante()" style="margin-top:10px;">Cerrar sesión</button>
+    </div>
+    <div class="card">
+      <h2>Elige el día</h2>
+      <div class="jorn-grid" id="j-jornadas"></div>
+      <p class="hint" id="j-jorn-info"></p>
+      <div id="j-partidos"></div>
+      <p class="hint" id="j-sin-partidos" style="display:none;">Este día aún no tiene partidos cargados (eliminatorias: los cruces se conocen al cerrar la fase anterior). La organizadora los carga desde Admin y aparecerán solos aquí.</p>
+    </div>
+    <div class="card">
+      <h2>Guardar predicción</h2>
+      <button id="j-btn-guardar" onclick="guardarPrediccion()">💾 Guardar mi predicción del día</button>
+      <p class="hint" id="j-aviso" style="margin-top:8px;"></p>
+    </div>
+    <div class="card">
+      <h2>📋 Mis pronósticos</h2>
+      <p class="hint">Aquí ves todo lo que has marcado y cuántos puntos llevas.</p>
+      <div id="j-mis"></div>
+    </div>
   </div>
-  <div class="card">
-    <h2>Guardar predicción</h2>
-    <button id="j-btn-guardar" onclick="guardarPrediccion()">💾 Guardar mi predicción del día</button>
-    <p class="hint" id="j-aviso" style="margin-top:8px;"></p>
+</div>
+
+<!-- ================= RESULTADOS DE PARTICIPANTES ================= -->
+<div class="panel" id="p-resultados">
+  <div class="card" id="res-login-aviso" style="display:none;">
+    <h2>👁️ Resultados de participantes</h2>
+    <p class="hint">Inicia sesión en la pestaña <b>✏️ Predecir</b> para poder ver los pronósticos de los demás.</p>
   </div>
-  <div class="card">
-    <h2>📋 Mis pronósticos</h2>
-    <p class="hint">Escribe tu nombre arriba para ver todo lo que has marcado y cuántos puntos llevas.</p>
-    <div id="j-mis"></div>
+  <div id="res-zona" style="display:none;">
+    <div class="card">
+      <h2>👁️ Pronósticos de participantes <button class="mini sec" style="float:right" onclick="cargarTodo(true)">🔄 Actualizar</button></h2>
+      <p class="hint">Solo puedes ver el pronóstico de los demás en los partidos que <b>ya cerraron</b> (5 min después del pitazo). Mientras un partido sigue abierto, los pronósticos permanecen ocultos.</p>
+      <div class="jorn-grid" id="res-jornadas"></div>
+      <p class="hint" id="res-info"></p>
+      <div id="res-detalle"></div>
+    </div>
   </div>
 </div>
 
 <!-- ================= RANKING ================= -->
 <div class="panel" id="p-ranking">
   <div class="card">
-    <h2>🏆 Ranking acumulado <button class="mini sec" style="float:right" onclick="cargarTodo(true)">🔄 Actualizar</button></h2>
+    <h2>🏆 Ranking acumulado general <button class="mini sec" style="float:right" onclick="cargarTodo(true)">🔄 Actualizar</button></h2>
+    <p class="hint">Suma de todos los puntos de todo el torneo.</p>
     <div id="r-tabla"></div>
+  </div>
+  <div class="card">
+    <h2>📅 Ranking por Fecha / Fase</h2>
+    <p class="hint">Cada Fecha (o fase eliminatoria) se cuenta por separado, empezando desde 0. Los puntos de una fecha no se suman con los de otra.</p>
+    <div class="jorn-grid" id="r-periodos"></div>
+    <div id="r-periodo-tabla"></div>
   </div>
   <div class="card">
     <h2>💰 Pozos por fase</h2>
@@ -175,6 +219,20 @@
     <div class="card">
       <h2>Participantes</h2>
       <div id="a-participantes"></div>
+    </div>
+
+    <div class="card">
+      <h2>🔐 Usuarios y contraseñas</h2>
+      <p class="hint">Asigna o restablece la contraseña de cada participante (mínimo 3 caracteres). Sin contraseña, el participante no puede iniciar sesión para predecir.</p>
+      <div id="a-usuarios"></div>
+      <details style="margin-top:12px;"><summary>➕ Crear cuenta nueva</summary>
+        <div class="flexrow" style="margin-top:8px;">
+          <div><label>Nombre</label><input type="text" id="a-nuevo-nombre" maxlength="20" placeholder="Ej: Carlos"></div>
+          <div><label>Contraseña</label><input type="text" id="a-nuevo-pass" placeholder="clave inicial"></div>
+          <button class="mini sec" onclick="adminCrearCuenta()">Crear</button>
+        </div>
+        <p class="hint" style="margin-top:8px;">Útil para registrar a alguien que aún no ha entrado nunca.</p>
+      </details>
     </div>
 
     <div class="card">
@@ -412,13 +470,34 @@ function nombreFase(fid){ return FASES.find(f=>f.id===fid)?.nombre||fid; }
      campeonReal: "País"
    }
 ============================================================ */
-let DB = {partidos:{}, res:{}, preds:{}, campeones:{}, campeonReal:"", horas:{}};
+let DB = {partidos:{}, res:{}, preds:{}, campeones:{}, campeonReal:"", horas:{}, auth:{}};
 let cargando = false;
 
 /* localStorage solo para mi borrador / mi nombre local */
 const LSK = "polla2026v2_local_"+POLLA_ID;
 function loadLocal(){ try{return JSON.parse(localStorage.getItem(LSK))||{};}catch(e){return {};} }
 function saveLocal(s){ localStorage.setItem(LSK, JSON.stringify(s)); }
+
+/* ============ SESIÓN / AUTENTICACIÓN ============
+   Las contraseñas las asigna la organizadora desde Admin. Se guardan en la
+   nube (scope "auth") como hash PBKDF2-SHA256 con sal aleatoria por usuario;
+   nunca se guarda la contraseña en texto. Nota: al ser un archivo estático con
+   clave pública de Supabase, esto evita la suplantación casual entre conocidos,
+   no es seguridad de grado bancario. */
+const SESK = "polla2026v2_sesion_"+POLLA_ID;
+function loadSesion(){ try{return JSON.parse(localStorage.getItem(SESK))||{nombre:null};}catch(e){return {nombre:null};} }
+function saveSesion(){ localStorage.setItem(SESK, JSON.stringify(SESION)); }
+let SESION = loadSesion();
+
+function bytesToHex(b){ return Array.from(b).map(x=>x.toString(16).padStart(2,"0")).join(""); }
+function hexToBytes(h){ const a=new Uint8Array(h.length/2); for(let i=0;i<a.length;i++) a[i]=parseInt(h.substr(i*2,2),16); return a; }
+async function pbkdf2(pass, saltHex){
+  const enc=new TextEncoder();
+  const key=await crypto.subtle.importKey("raw", enc.encode(pass), "PBKDF2", false, ["deriveBits"]);
+  const bits=await crypto.subtle.deriveBits({name:"PBKDF2", salt:hexToBytes(saltHex), iterations:120000, hash:"SHA-256"}, key, 256);
+  return bytesToHex(new Uint8Array(bits));
+}
+function nuevaSal(){ return bytesToHex(crypto.getRandomValues(new Uint8Array(16))); }
 
 function getPartidos(jid){
   if(DB.partidos?.[jid]?.length) return DB.partidos[jid];
@@ -479,16 +558,17 @@ async function sbDelete(scope, clave){
   await sb.from("polla_kv").delete().match({polla_id:POLLA_ID, scope, clave});
 }
 async function cargarTodo(avisar){
-  if(!sb){ DB = Object.assign({partidos:{},res:{},preds:{},campeones:{},campeonReal:"",horas:{}}, loadLocal().DB||{}); renderAll(); return; }
+  if(!sb){ DB = Object.assign({partidos:{},res:{},preds:{},campeones:{},campeonReal:"",horas:{},auth:{}}, loadLocal().DB||{}); renderAll(); return; }
   cargando = true; setConn("cargando");
   const {data, error} = await sb.from("polla_kv").select("scope,clave,valor").eq("polla_id", POLLA_ID);
   cargando = false;
   if(error){ setConn("error"); if(avisar) toast("No se pudo leer la nube",true); console.error(error); return; }
-  const nuevo = {partidos:{}, res:{}, preds:{}, campeones:{}, campeonReal:"", horas:{}};
+  const nuevo = {partidos:{}, res:{}, preds:{}, campeones:{}, campeonReal:"", horas:{}, auth:{}};
   for(const row of (data||[])){
     if(row.scope==="partidos") nuevo.partidos[row.clave]=row.valor;
     else if(row.scope==="res") nuevo.res[row.clave]=row.valor;
     else if(row.scope==="hora") nuevo.horas[row.clave]=row.valor;
+    else if(row.scope==="auth") nuevo.auth[row.clave]=row.valor;
     else if(row.scope==="meta" && row.clave==="campeonReal") nuevo.campeonReal=row.valor||"";
     else if(row.scope==="pred"){
       // clave = "nombre|dia"
@@ -576,6 +656,14 @@ function setv(id,v){const e=document.getElementById(id); if(e)e.value=v;}
 
 /* ============ PESTAÑA PREDECIR ============ */
 function renderJugar(){
+  // Gate de sesión: sin login no se muestran los partidos
+  const logCard=document.getElementById("j-login-card");
+  const zona=document.getElementById("j-zona");
+  if(!SESION.nombre){ if(logCard)logCard.style.display="block"; if(zona)zona.style.display="none"; return; }
+  if(logCard)logCard.style.display="none"; if(zona)zona.style.display="block";
+  const saludo=document.getElementById("j-saludo");
+  if(saludo) saludo.innerHTML=`Sesión iniciada como <b>${SESION.nombre}</b>.`;
+
   renderJornBtns("j-jornadas", jSel, "pickJ", true);
   const j=DIAS.find(x=>x.id===jSel);
   const ps=getPartidos(jSel);
@@ -589,8 +677,7 @@ function renderJugar(){
   document.getElementById("j-sin-partidos").style.display = n? "none":"block";
 
   const local=loadLocal();
-  if(local.miNombre) setv("j-nombre", local.miNombre);
-  const nombre = val("j-nombre").trim();
+  const nombre = SESION.nombre;
 
   // si ya tengo predicción guardada para este día en la nube, la muestro
   const guardadas = nombre && DB.preds?.[nombre]?.[jSel];
@@ -621,10 +708,10 @@ function renderJugar(){
   renderMis();
 }
 function renderMis(){
-  const nombre=val("j-nombre").trim();
+  const nombre=SESION.nombre;
   const cont=document.getElementById("j-mis");
   if(!cont) return;
-  if(!nombre){ cont.innerHTML="<span class='hint'>Escribe tu nombre para ver tus pronósticos.</span>"; return; }
+  if(!nombre){ cont.innerHTML="<span class='hint'>Inicia sesión para ver tus pronósticos.</span>"; return; }
   const mp=DB.preds?.[nombre];
   if(!mp || !Object.keys(mp).length){
     cont.innerHTML="<span class='hint'>Aún no hay pronósticos guardados con el nombre <b>"+nombre+"</b>. (Ojo: usa siempre el mismo nombre, igualito.)</span>";
@@ -645,8 +732,9 @@ function renderMis(){
     `<table><tr><th>Día</th><th>Tus marcadores</th><th>Pts</th></tr>${filas}</table>`;
 }
 async function guardarPrediccion(){
-  const nombre=val("j-nombre").trim();
+  const nombre=SESION.nombre;
   const aviso=document.getElementById("j-aviso");
+  if(!nombre){ aviso.innerHTML="<span class='warn'>⚠️ Debes iniciar sesión para guardar.</span>"; return; }
   const ps=getPartidos(jSel);
   const locks=ps.map((_,i)=>partidoCerrado(jSel,i));
   if(ps.length && locks.every(Boolean)){ aviso.innerHTML="<span class='warn'>🔒 Todos los partidos de este día ya cerraron, no se puede guardar.</span>"; return; }
@@ -682,9 +770,33 @@ async function guardarPrediccion(){
   if(!DB.campeones[nombre]) DB.campeones[nombre]=campElegido;
   aviso.innerHTML="<span class='ok'>✅ ¡Predicción guardada en la nube para "+j_etiqueta(jSel)+"!</span>";
   toast("Predicción guardada");
-  renderJugar(); renderParticipantes();
+  renderJugar(); renderParticipantes(); renderResultados();
 }
 function j_etiqueta(jid){ return DIAS.find(d=>d.id===jid)?.et || jid; }
+
+/* ============ LOGIN / LOGOUT DE PARTICIPANTE ============ */
+async function loginParticipante(){
+  const n=(val("j-login-nombre")||"").trim();
+  const pass=(val("j-login-pass")||"").trim();
+  const msg=document.getElementById("j-login-msg");
+  msg.innerHTML="";
+  if(!n||!pass){ msg.textContent="Escribe tu nombre y tu contraseña."; return; }
+  if(!sb){ msg.textContent="No hay conexión con la nube en este momento."; return; }
+  let a=DB.auth?.[n];
+  if(!a){ await cargarTodo(false); a=DB.auth?.[n]; }   // por si aún no había cargado
+  if(!a){ msg.innerHTML="No hay contraseña asignada a <b>"+n+"</b>. Pídesela a la organizadora. (Ojo: escribe tu nombre igualito a como aparece en la polla.)"; return; }
+  const h=await pbkdf2(pass, a.s);
+  if(h!==a.h){ msg.textContent="Contraseña incorrecta."; return; }
+  SESION={nombre:n}; saveSesion();
+  setv("j-login-pass","");
+  renderJugar(); renderResultados();
+  toast("¡Hola, "+n+"!");
+}
+function logoutParticipante(){
+  SESION={nombre:null}; saveSesion();
+  renderJugar(); renderResultados();
+  toast("Sesión cerrada");
+}
 
 /* ============ PESTAÑA ADMIN ============ */
 let adminOK=false;
@@ -693,7 +805,7 @@ function entrarAdmin(){
     adminOK=true;
     document.getElementById("admin-login").style.display="none";
     document.getElementById("admin-zona").style.display="block";
-    renderAdminJornada(); renderParticipantes();
+    renderAdminJornada(); renderParticipantes(); renderUsuarios();
     fillSelect("a-campeon"); if(DB.campeonReal) setv("a-campeon",DB.campeonReal);
     toast("Modo admin activado");
   } else { toast("PIN incorrecto",true); }
@@ -769,7 +881,56 @@ async function quitarPart(nEnc){
   // borrar todas sus predicciones
   for(const dia of Object.keys(DB.preds[n]||{})) await sbDelete("pred", n+"|"+dia);
   delete DB.preds[n]; if(DB.campeones) delete DB.campeones[n];
-  renderParticipantes(); renderRanking(); toast("Participante eliminado");
+  renderParticipantes(); renderRanking(); renderUsuarios(); toast("Participante eliminado");
+}
+
+/* ============ GESTIÓN DE USUARIOS Y CONTRASEÑAS (admin) ============ */
+function renderUsuarios(){
+  const cont=document.getElementById("a-usuarios"); if(!cont||!adminOK) return;
+  const set=new Set([...Object.keys(DB.preds||{}), ...Object.keys(DB.auth||{})]);
+  const names=[...set].sort((a,b)=>a.localeCompare(b));
+  if(!names.length){ cont.innerHTML="<p class='hint'>Aún no hay participantes registrados.</p>"; return; }
+  cont.innerHTML=names.map((n,idx)=>{
+    const tiene=!!DB.auth?.[n];
+    const inp="a-pw-"+idx;
+    return `<div class="partido">
+      <div class="nombre">${n} ${tiene?'<span class="estado on">● con clave</span>':'<span class="estado off">● sin clave</span>'}</div>
+      <div class="marcador">
+        <input type="text" id="${inp}" placeholder="${tiene?'nueva clave':'clave'}" style="width:130px;text-align:left">
+        <button class="mini" onclick="adminSetPass('${encodeURIComponent(n)}','${inp}')">${tiene?'Restablecer':'Asignar'}</button>
+        ${tiene?`<button class="mini danger" title="Quitar contraseña" onclick="adminQuitarPass('${encodeURIComponent(n)}')">✕</button>`:""}
+      </div></div>`;
+  }).join("");
+}
+async function adminSetPass(nEnc, inputId){
+  const n=decodeURIComponent(nEnc);
+  const pass=(val(inputId)||"").trim();
+  if(pass.length<3){ toast("La clave debe tener al menos 3 caracteres",true); return; }
+  const s=nuevaSal(); const h=await pbkdf2(pass, s);
+  const {error}=await sbUpsert("auth", n, {h,s});
+  if(error){ toast("No se pudo guardar la clave",true); return; }
+  DB.auth=DB.auth||{}; DB.auth[n]={h,s};
+  renderUsuarios(); toast("Clave asignada a "+n);
+}
+async function adminQuitarPass(nEnc){
+  const n=decodeURIComponent(nEnc);
+  if(!confirm("¿Quitar la contraseña de "+n+"? No podrá iniciar sesión hasta que le asignes otra.")) return;
+  await sbDelete("auth", n);
+  if(DB.auth) delete DB.auth[n];
+  renderUsuarios(); toast("Contraseña eliminada");
+}
+async function adminCrearCuenta(){
+  const n=(val("a-nuevo-nombre")||"").trim();
+  const pass=(val("a-nuevo-pass")||"").trim();
+  if(!n){ toast("Escribe un nombre",true); return; }
+  if(pass.length<3){ toast("La clave debe tener al menos 3 caracteres",true); return; }
+  if(DB.auth?.[n]){ toast("Ya existe una cuenta con ese nombre",true); return; }
+  const s=nuevaSal(); const h=await pbkdf2(pass, s);
+  const {error}=await sbUpsert("auth", n, {h,s});
+  if(error){ toast("No se pudo crear la cuenta",true); return; }
+  DB.auth=DB.auth||{}; DB.auth[n]={h,s};
+  setv("a-nuevo-nombre",""); setv("a-nuevo-pass","");
+  renderUsuarios(); toast("Cuenta creada: "+n);
 }
 function exportarTodo(){
   const blob=new Blob([JSON.stringify({polla:POLLA_ID, ...DB},null,1)],{type:"application/json"});
@@ -826,6 +987,15 @@ function puntosJornada(predM, resM, fecha){
   });
   return {pts,ex};
 }
+/* Puntos de UN solo partido (para la pestaña Resultados) */
+function puntosPartido(pm, rm, fecha){
+  if(!pm||!rm) return 0;
+  const P=ptsDe(fecha);
+  if(pm[0]===rm[0] && pm[1]===rm[1]) return P.exacto;
+  if(P.diferencia!==undefined && (pm[0]-pm[1])===(rm[0]-rm[1])) return P.diferencia;
+  if(Math.sign(pm[0]-pm[1])===Math.sign(rm[0]-rm[1])) return P.resultado;
+  return 0;
+}
 /* Ganador(es) de una Fecha (ronda de grupos), a partir de las filas ya calculadas */
 function ganadoresDeFecha(fechaObj, filas, res){
   const hayRes = fechaObj.dias.some(d=>res[d]?.some(x=>x));
@@ -852,6 +1022,9 @@ function renderRanking(){
     if(DB.campeonReal && DB.campeones?.[n]===DB.campeonReal){ bonus=PTS.campeon; tot+=bonus; }
     return {n, tot, ex, porFase, porFecha, bonus, camp:DB.campeones?.[n]||"—"};
   }).sort((a,b)=> b.tot-a.tot || b.ex-a.ex || (b.bonus-a.bonus));
+
+  // Ranking independiente por Fecha / Fase
+  renderPeriodoRanking(filas, res);
 
   // 🎉 Banner: felicitación al ganador de la Fecha 1
   const f1 = ganadoresDeFecha(FECHAS[0], filas, res);
@@ -898,6 +1071,77 @@ function renderRanking(){
   porJ.innerHTML=fechasHTML+pozosHTML+detHTML;
 }
 
+/* ============ PESTAÑA RESULTADOS DE PARTICIPANTES ============
+   Solo se muestran los pronósticos de los demás en partidos YA CERRADOS
+   (5 min después del pitazo). Mientras el partido sigue abierto, se ocultan. */
+let resSel = jornadaActual();
+function pickR(jid){ resSel=jid; renderResultados(); }
+function renderResultados(){
+  const aviso=document.getElementById("res-login-aviso");
+  const zona=document.getElementById("res-zona");
+  if(!aviso||!zona) return;
+  if(!SESION.nombre){ aviso.style.display="block"; zona.style.display="none"; return; }
+  aviso.style.display="none"; zona.style.display="block";
+
+  renderJornBtns("res-jornadas", resSel, "pickR");
+  const j=DIAS.find(x=>x.id===resSel);
+  const ps=getPartidos(resSel);
+  document.getElementById("res-info").innerHTML=`<b>${j.et} · ${nombreFase(j.fase)}</b>`;
+  const det=document.getElementById("res-detalle");
+  if(!ps.length){ det.innerHTML="<p class='hint'>Este día aún no tiene partidos cargados.</p>"; return; }
+
+  const preds=DB.preds||{}, res=DB.res||{};
+  const names=Object.keys(preds).sort((a,b)=>a.localeCompare(b));
+  let html="";
+  ps.forEach((p,i)=>{
+    const cerrado=partidoCerrado(resSel,i);
+    const rm=res[resSel]?.[i];
+    html+=`<div class="card" style="margin:10px 0;background:var(--card2)">
+      <h2 style="font-size:.95rem;color:var(--text)">${p[0]} 🆚 ${p[1]}<span class="fecha">${p[2]||""}</span></h2>`;
+    if(!cerrado){
+      const ht=horaInicioTxt(resSel,i);
+      html+=`<p class="hint">🔒 Partido abierto${ht?` (inicia ${ht})`:""}. Los pronósticos se mostrarán cuando cierre.</p></div>`;
+      return;
+    }
+    html+=`<p class="hint">Resultado real: <b>${rm?`${rm[0]} - ${rm[1]}`:"pendiente de cargar"}</b></p>`;
+    let filas="";
+    names.forEach(n=>{
+      const pm=preds[n]?.[resSel]?.[i];
+      if(!pm) return;
+      const pts = rm ? puntosPartido(pm, rm, j.fecha) : null;
+      const mio = n===SESION.nombre;
+      filas+=`<tr class="${mio?'pos1':''}"><td>${n}${mio?" (tú)":""}</td><td><b>${pm[0]} - ${pm[1]}</b></td><td>${pts!==null?pts:"<span class='hint'>—</span>"}</td></tr>`;
+    });
+    html+=`<table><tr><th>Participante</th><th>Pronóstico</th><th>Pts</th></tr>${filas||"<tr><td colspan='3' class='hint'>Nadie pronosticó este partido.</td></tr>"}</table></div>`;
+  });
+  det.innerHTML=html;
+}
+
+/* ============ RANKING POR FECHA / FASE (independiente, desde 0) ============ */
+let rankPeriodo=null;
+function pickPeriodo(pid){ rankPeriodo=pid; renderRanking(); }
+function renderPeriodoRanking(filas, res){
+  const cont=document.getElementById("r-periodos"); if(!cont) return;
+  const periodos=[
+    ...FECHAS.map(f=>({id:f.id, et:f.nombre, sub:f.rango, tipo:"fecha"})),
+    ...FASES.filter(f=>f.pozo).map(f=>({id:f.id, et:f.nombre, sub:"eliminatoria", tipo:"fase"}))
+  ];
+  if(!periodos.some(p=>p.id===rankPeriodo)) rankPeriodo=periodos[0].id;
+  cont.innerHTML=periodos.map(p=>`<div class="jorn-btn ${p.id===rankPeriodo?'activa':''}" onclick="pickPeriodo('${p.id}')"><b>${p.et}</b><span style="font-size:.66rem">${p.sub}</span></div>`).join("");
+
+  const per=periodos.find(p=>p.id===rankPeriodo);
+  const getPts = per.tipo==="fecha" ? (f=>f.porFecha[per.id]||0) : (f=>f.porFase[per.id]||0);
+  const dias = per.tipo==="fecha" ? FECHAS.find(x=>x.id===per.id).dias
+                                  : DIAS.filter(d=>d.fase===per.id).map(d=>d.id);
+  const hayRes = dias.some(d=>res[d]?.some(x=>x));
+  const tcont=document.getElementById("r-periodo-tabla");
+  if(!hayRes){ tcont.innerHTML=`<p class="hint">Aún no hay resultados cargados para <b>${per.et}</b>.</p>`; return; }
+  const orden=filas.map(f=>({n:f.n, p:getPts(f)})).sort((a,b)=>b.p-a.p);
+  tcont.innerHTML=`<table><tr><th>#</th><th>Participante</th><th>Pts en ${per.et}</th></tr>`+
+    orden.map((o,i)=>`<tr class="${i===0&&o.p>0?'pos1':''}"><td>${i===0?"🥇":i===1?"🥈":i===2?"🥉":i+1}</td><td>${o.n}</td><td><b>${o.p}</b></td></tr>`).join("")+
+    `</table>`;
+}
+
 /* ============ INIT ============ */
 function fillSelect(id){
   const e=document.getElementById(id); if(!e) return;
@@ -908,8 +1152,8 @@ function renderAll(){
     DIAS.map(j=>`<tr ${j.id===jornadaActual()?"class='pos1'":""}><td>${j.et}</td><td>${nombreFase(j.fase)}</td><td>${getPartidos(j.id).length||"por definir"}</td></tr>`).join("")+"</table>";
   const act=DIAS.find(j=>j.id===jornadaActual());
   document.getElementById("hdr-sub").innerHTML="Día en curso: <b style='color:var(--accent)'>"+act.et+"</b> · "+nombreFase(act.fase);
-  renderJugar(); renderRanking(); renderParticipantes();
-  if(adminOK) renderAdminJornada();
+  renderJugar(); renderRanking(); renderParticipantes(); renderResultados();
+  if(adminOK){ renderAdminJornada(); renderUsuarios(); }
 }
 document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{
   document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));
@@ -917,6 +1161,8 @@ document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{
   t.classList.add("active");
   document.getElementById("p-"+t.dataset.p).classList.add("active");
   if(t.dataset.p==="ranking") cargarTodo(false);
+  else if(t.dataset.p==="resultados") renderResultados();
+  else if(t.dataset.p==="jugar") renderJugar();
 });
 let toastT;
 function toast(msg,bad){
@@ -929,9 +1175,14 @@ async function initAll(){
   document.getElementById("polla-id-lbl").textContent = "polla: "+POLLA_ID;
   document.getElementById("setup-banner").style.display = CONFIGURADO ? "none" : "block";
   fillSelect("j-campeon"); fillSelect("a-eq1"); fillSelect("a-eq2");
-  const inNom=document.getElementById("j-nombre");
-  inNom.addEventListener("input", ()=>{ const l=loadLocal(); l.miNombre=inNom.value.trim(); saveLocal(l); });
-  inNom.addEventListener("change", ()=>{ renderJugar(); });
+  // recordar el último nombre escrito en el login (comodidad)
+  const inNom=document.getElementById("j-login-nombre");
+  if(inNom){
+    const l0=loadLocal(); if(l0.miNombre) inNom.value=l0.miNombre;
+    inNom.addEventListener("input", ()=>{ const l=loadLocal(); l.miNombre=inNom.value.trim(); saveLocal(l); });
+    const inPw=document.getElementById("j-login-pass");
+    if(inPw) inPw.addEventListener("keydown", e=>{ if(e.key==="Enter") loginParticipante(); });
+  }
   setConn(CONFIGURADO?"cargando":"off");
   renderAll();
   await cargarTodo(false);
