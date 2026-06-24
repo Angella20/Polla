@@ -78,6 +78,13 @@
   .evo-name{fill:var(--text); font-size:12px; font-weight:600;}
   .evo-tot{fill:var(--muted); font-size:11px;}
   .evo-slot-init{fill:#0d1321; font-size:13px; font-weight:800; text-anchor:middle; dominant-baseline:central;}
+  .evo-foto-row{display:flex; align-items:center; gap:10px; padding:8px 4px; border-bottom:1px dashed var(--border);}
+  .evo-foto-row:last-child{border-bottom:none;}
+  .evo-foto-prev{width:40px; height:40px; border-radius:50%; overflow:hidden; flex:none; background:var(--card2); border:1px solid var(--border); display:flex; align-items:center; justify-content:center; color:var(--muted); font-weight:800;}
+  .evo-foto-prev img{width:100%; height:100%; object-fit:cover;}
+  .evo-foto-name{flex:1; font-size:.88rem; min-width:80px;}
+  .evo-foto-btn{background:var(--accent2); color:#fff; padding:7px 12px; border-radius:9px; font-size:.78rem; font-weight:600; cursor:pointer; white-space:nowrap;}
+  .evo-foto-btn:active{transform:scale(.97);}
 </style>
 </head>
 <body>
@@ -223,20 +230,27 @@
 <!-- ================= EVOLUCIÓN ================= -->
 <div class="panel" id="p-evolucion">
   <div class="card">
-    <h2>📈 Evolución de puntos por fecha <button class="mini sec" style="float:right" onclick="cargarTodo(true)">🔄 Actualizar</button></h2>
-    <p class="hint">Puntos <b>acumulados</b> de cada participante, día por día. Cada línea termina en un círculo: ahí va su carita. 🙂</p>
+    <h2>📈 Evolución de puntos <button class="mini sec" style="float:right" onclick="cargarTodo(true)">🔄 Actualizar</button></h2>
+    <p class="hint">Elige <b>Todo el torneo</b> o una <b>Fecha</b> concreta. En cada Fecha el conteo empieza desde 0 (igual que en el Ranking). Cada línea termina en un círculo: ahí va la carita. 🙂</p>
+    <div class="jorn-grid" id="evo-periodos"></div>
     <div class="evo-toolbar">
       <label style="display:inline-flex;align-items:center;gap:6px;font-size:.78rem;margin:0;">
         <input type="checkbox" id="evo-acum" checked style="width:auto;margin:0;"> Acumulado
       </label>
       <span class="hint" style="margin:0;">·</span>
       <label style="display:inline-flex;align-items:center;gap:6px;font-size:.78rem;margin:0;">
-        <input type="checkbox" id="evo-caritas" checked style="width:auto;margin:0;"> Mostrar slots de caritas
+        <input type="checkbox" id="evo-caritas" checked style="width:auto;margin:0;"> Mostrar caritas
       </label>
     </div>
     <div id="evo-leyenda" class="evo-leyenda"></div>
     <div id="evo-chart-wrap" class="evo-chart-wrap"></div>
     <p class="hint" id="evo-nota" style="margin-top:8px;"></p>
+  </div>
+
+  <div class="card">
+    <h2>🙂 Fotos de las caritas</h2>
+    <p class="hint">Sube una foto para cada participante. Aparecerá dentro de su círculo al final de la línea. Se guarda en la nube, así que todos la ven.</p>
+    <div id="evo-fotos"></div>
   </div>
 </div>
 
@@ -593,17 +607,18 @@ async function sbDelete(scope, clave){
   await sb.from("polla_kv").delete().match({polla_id:POLLA_ID, scope, clave});
 }
 async function cargarTodo(avisar){
-  if(!sb){ DB = Object.assign({partidos:{},res:{},preds:{},campeones:{},campeonReal:"",horas:{},auth:{}}, loadLocal().DB||{}); renderAll(); return; }
+  if(!sb){ DB = Object.assign({partidos:{},res:{},preds:{},campeones:{},campeonReal:"",horas:{},auth:{},caritas:{}}, loadLocal().DB||{}); if(!DB.caritas) DB.caritas={}; renderAll(); return; }
   cargando = true; setConn("cargando");
   const {data, error} = await sb.from("polla_kv").select("scope,clave,valor").eq("polla_id", POLLA_ID);
   cargando = false;
   if(error){ setConn("error"); if(avisar) toast("No se pudo leer la nube",true); console.error(error); return; }
-  const nuevo = {partidos:{}, res:{}, preds:{}, campeones:{}, campeonReal:"", horas:{}, auth:{}};
+  const nuevo = {partidos:{}, res:{}, preds:{}, campeones:{}, campeonReal:"", horas:{}, auth:{}, caritas:{}};
   for(const row of (data||[])){
     if(row.scope==="partidos") nuevo.partidos[row.clave]=row.valor;
     else if(row.scope==="res") nuevo.res[row.clave]=row.valor;
     else if(row.scope==="hora") nuevo.horas[row.clave]=row.valor;
     else if(row.scope==="auth") nuevo.auth[row.clave]=row.valor;
+    else if(row.scope==="carita") nuevo.caritas[row.clave]=row.valor?.img || row.valor || "";
     else if(row.scope==="meta" && row.clave==="campeonReal") nuevo.campeonReal=row.valor||"";
     else if(row.scope==="pred"){
       // clave = "nombre|dia"
@@ -1193,27 +1208,53 @@ function evoDiaCorto(fecha){
   const [_,m,d] = fecha.split("-");
   return `${parseInt(d,10)}/${parseInt(m,10)}`;
 }
+function evoEsc(t){ return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+/* Periodos disponibles para la Evolución: Todo + cada Fecha + cada eliminatoria */
+function evoPeriodos(){
+  return [
+    {id:"ALL", et:"Todo el torneo", sub:"acumulado general", dias:DIAS.map(d=>d.id)},
+    ...FECHAS.map(f=>({id:f.id, et:f.nombre, sub:f.rango, dias:f.dias})),
+    ...FASES.filter(f=>f.pozo).map(f=>({id:f.id, et:f.nombre, sub:"eliminatoria", dias:DIAS.filter(d=>d.fase===f.id).map(d=>d.id)}))
+  ];
+}
+let evoPeriodo = "ALL";
+function pickEvoPeriodo(id){ evoPeriodo = id; renderEvolucion(); }
+function renderEvoPeriodos(){
+  const cont = document.getElementById("evo-periodos"); if(!cont) return;
+  const res = DB.res||{};
+  const pers = evoPeriodos();
+  if(!pers.some(p=>p.id===evoPeriodo)) evoPeriodo="ALL";
+  cont.innerHTML = pers.map(p=>{
+    const hayRes = p.dias.some(d=>(res[d]||[]).some(x=>x));
+    return `<div class="jorn-btn ${p.id===evoPeriodo?'activa':''}" style="${hayRes?'':'opacity:.5'}" onclick="pickEvoPeriodo('${p.id}')">
+      <b>${p.et}</b><span style="font-size:.66rem">${p.sub}</span>${hayRes?'':'<br><span style="font-size:.62rem">sin datos</span>'}</div>`;
+  }).join("");
+}
 function renderEvolucion(){
   const wrap = document.getElementById("evo-chart-wrap");
   const leyenda = document.getElementById("evo-leyenda");
   const nota = document.getElementById("evo-nota");
   if(!wrap) return;
-  const preds = DB.preds||{}, res = DB.res||{};
+  renderEvoPeriodos();
+  renderEvoFotos();
+  const preds = DB.preds||{}, res = DB.res||{}, fotos = DB.caritas||{};
   const names = Object.keys(preds);
   if(!names.length){
     wrap.innerHTML="<p class='hint'>Aún no hay predicciones para graficar.</p>";
     leyenda.innerHTML=""; nota.textContent=""; return;
   }
-  // Días con al menos un resultado cargado, en orden cronológico
-  const diasConRes = DIAS.filter(d => (res[d.id]||[]).some(x=>x));
+  // Días del periodo elegido (Todo, o una Fecha/eliminatoria) que ya tienen resultado
+  const per = evoPeriodos().find(p=>p.id===evoPeriodo) || evoPeriodos()[0];
+  const diasPer = DIAS.filter(d=> per.dias.includes(d.id));
+  const diasConRes = diasPer.filter(d => (res[d.id]||[]).some(x=>x));
   if(!diasConRes.length){
-    wrap.innerHTML="<p class='hint'>Todavía no hay resultados cargados. Cuando el admin cargue marcadores, la curva aparece aquí.</p>";
+    wrap.innerHTML=`<p class='hint'>Aún no hay resultados cargados para <b>${per.et}</b>. Elige otro periodo o espera a que el admin cargue marcadores.</p>`;
     leyenda.innerHTML=""; nota.textContent=""; return;
   }
   const acumular = document.getElementById("evo-acum")?.checked !== false;
   const verCaritas = document.getElementById("evo-caritas")?.checked !== false;
 
-  // Serie de cada participante: valor en cada día (acumulado o por día)
+  // Serie de cada participante: el conteo empieza desde 0 dentro del periodo
   const series = names.map((n,idx)=>{
     let run = 0;
     const vals = diasConRes.map(d=>{
@@ -1229,7 +1270,7 @@ function renderEvolucion(){
   // Geometría
   const N = diasConRes.length;
   const mL = 44, mT = 26, mB = 54, mR = 150;
-  const stepX = Math.max(60, N>1 ? 78 : 78);
+  const stepX = 78;
   const plotW = (N-1) * stepX || stepX;
   const W = mL + plotW + mR;
   const plotH = 360;
@@ -1248,10 +1289,23 @@ function renderEvolucion(){
     g += `<line class="evo-grid" x1="${mL}" y1="${y.toFixed(1)}" x2="${(mL+plotW).toFixed(1)}" y2="${y.toFixed(1)}"/>`;
     g += `<text class="evo-axis" x="${mL-8}" y="${(y+4).toFixed(1)}" text-anchor="end">${v}</text>`;
   }
+  // Bandas/separadores por Fecha (solo en la vista "Todo el torneo")
+  if(evoPeriodo==="ALL"){
+    let bi=0;
+    FECHAS.concat(FASES.filter(f=>f.pozo).map(f=>({id:f.id,nombre:f.nombre,dias:DIAS.filter(d=>d.fase===f.id).map(d=>d.id)})))
+    .forEach(blk=>{
+      const idxs = diasConRes.map((d,i)=>blk.dias.includes(d.id)?i:-1).filter(i=>i>=0);
+      if(!idxs.length) return;
+      const x0=X(Math.min(...idxs)), x1=X(Math.max(...idxs));
+      if(bi%2===1) g += `<rect x="${(x0-stepX/2).toFixed(1)}" y="${mT}" width="${(x1-x0+stepX).toFixed(1)}" height="${plotH}" fill="var(--card2)" opacity="0.35"/>`;
+      g += `<text class="evo-axis" x="${((x0+x1)/2).toFixed(1)}" y="${(mT-10).toFixed(1)}" text-anchor="middle" style="font-size:11px;font-weight:700;fill:var(--accent)">${blk.nombre}</text>`;
+      bi++;
+    });
+  }
   // Etiquetas X (días)
   diasConRes.forEach((d,i)=>{
     const x = X(i);
-    g += `<line class="evo-grid" x1="${x.toFixed(1)}" y1="${mT}" x2="${x.toFixed(1)}" y2="${(mT+plotH).toFixed(1)}" opacity="0.35"/>`;
+    g += `<line class="evo-grid" x1="${x.toFixed(1)}" y1="${mT}" x2="${x.toFixed(1)}" y2="${(mT+plotH).toFixed(1)}" opacity="0.25"/>`;
     g += `<text class="evo-axis" x="${x.toFixed(1)}" y="${(mT+plotH+18).toFixed(1)}" text-anchor="middle">${evoDiaCorto(d.fecha)}</text>`;
     g += `<text class="evo-axis" x="${x.toFixed(1)}" y="${(mT+plotH+34).toFixed(1)}" text-anchor="middle" opacity="0.7" style="font-size:9px">${nombreFase(d.fase)}</text>`;
   });
@@ -1262,52 +1316,115 @@ function renderEvolucion(){
     const pts = s.vals.map((v,i)=>`${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join(" ");
     paths += `<polyline class="evo-line" points="${pts}" stroke="${s.color}"/>`;
     s.vals.forEach((v,i)=>{
-      paths += `<circle class="evo-pt" cx="${X(i).toFixed(1)}" cy="${Y(v).toFixed(1)}" r="3.2" fill="${s.color}"><title>${s.n}: ${v} pts (${evoDiaCorto(diasConRes[i].fecha)})</title></circle>`;
+      paths += `<circle class="evo-pt" cx="${X(i).toFixed(1)}" cy="${Y(v).toFixed(1)}" r="3.2" fill="${s.color}"><title>${evoEsc(s.n)}: ${v} pts (${evoDiaCorto(diasConRes[i].fecha)})</title></circle>`;
     });
   });
 
   // Slots de caritas en columna a la derecha, de-solapados y ordenados por puntaje
-  const slotR = 17, gap = 42;
+  const slotR = 18, gap = 44;
   const colX = mL + plotW + 64;
-  // posiciones objetivo según el último valor, luego separar para que no se monten
   const targets = orden.map(s=> ({ s, y: Y(s.vals[s.vals.length-1]) }));
-  // separar verticalmente (greedy de arriba hacia abajo)
   for(let i=1;i<targets.length;i++){
     if(targets[i].y - targets[i-1].y < gap) targets[i].y = targets[i-1].y + gap;
   }
-  // si se salen por abajo, empujar hacia arriba
   const bottom = mT + plotH;
   let overflow = targets.length ? targets[targets.length-1].y - bottom : 0;
   if(overflow > 0){ targets.forEach(t=> t.y -= overflow); }
   targets.forEach(t=> { if(t.y < mT) t.y = mT; });
 
-  let slots = "";
-  targets.forEach(t=>{
-    const s = t.s;
+  let defs = "", slots = "";
+  targets.forEach((t,k)=>{
+    const s = t.s, cy = t.y;
     const lastX = X(s.vals.length-1), lastY = Y(s.vals[s.vals.length-1]);
-    // línea guía desde el final de la curva hasta el slot
-    slots += `<line class="evo-leader" x1="${lastX.toFixed(1)}" y1="${lastY.toFixed(1)}" x2="${(colX-slotR).toFixed(1)}" y2="${t.y.toFixed(1)}" stroke="${s.color}"/>`;
-    if(verCaritas){
-      // slot circular para la carita (la usuaria reemplaza esto luego)
-      slots += `<g class="evo-carita" data-jugador="${s.n.replace(/"/g,'&quot;')}">
-        <circle cx="${colX}" cy="${t.y.toFixed(1)}" r="${slotR}" fill="${s.color}" stroke="var(--bg)" stroke-width="2"/>
-        <text class="evo-slot-init" x="${colX}" y="${t.y.toFixed(1)}">${(s.n.trim()[0]||"?").toUpperCase()}</text>
+    const foto = fotos[s.n];
+    slots += `<line class="evo-leader" x1="${lastX.toFixed(1)}" y1="${lastY.toFixed(1)}" x2="${(colX-slotR).toFixed(1)}" y2="${cy.toFixed(1)}" stroke="${s.color}"/>`;
+    const dj = evoEsc(s.n), ini = evoEsc((s.n.trim()[0]||"?").toUpperCase());
+    if(verCaritas && foto){
+      // foto real recortada en círculo
+      defs += `<clipPath id="evo-clip-${k}"><circle cx="${colX}" cy="${cy.toFixed(1)}" r="${slotR}"/></clipPath>`;
+      slots += `<g class="evo-carita" data-jugador="${dj}">
+        <image href="${foto}" x="${(colX-slotR).toFixed(1)}" y="${(cy-slotR).toFixed(1)}" width="${2*slotR}" height="${2*slotR}" clip-path="url(#evo-clip-${k})" preserveAspectRatio="xMidYMid slice"/>
+        <circle cx="${colX}" cy="${cy.toFixed(1)}" r="${slotR}" fill="none" stroke="${s.color}" stroke-width="2.5"/>
+      </g>`;
+    } else if(verCaritas){
+      // slot vacío con inicial (aún sin foto)
+      slots += `<g class="evo-carita" data-jugador="${dj}">
+        <circle cx="${colX}" cy="${cy.toFixed(1)}" r="${slotR}" fill="${s.color}" stroke="var(--bg)" stroke-width="2"/>
+        <text class="evo-slot-init" x="${colX}" y="${cy.toFixed(1)}">${ini}</text>
       </g>`;
     } else {
-      slots += `<circle cx="${colX}" cy="${t.y.toFixed(1)}" r="5" fill="${s.color}" stroke="var(--bg)" stroke-width="1.5"/>`;
+      slots += `<circle cx="${colX}" cy="${cy.toFixed(1)}" r="5" fill="${s.color}" stroke="var(--bg)" stroke-width="1.5"/>`;
     }
-    slots += `<text class="evo-name" x="${(colX+slotR+8).toFixed(1)}" y="${(t.y-2).toFixed(1)}">${s.n}</text>`;
-    slots += `<text class="evo-tot" x="${(colX+slotR+8).toFixed(1)}" y="${(t.y+12).toFixed(1)}">${s.total} pts</text>`;
+    slots += `<text class="evo-name" x="${(colX+slotR+8).toFixed(1)}" y="${(cy-2).toFixed(1)}">${dj}</text>`;
+    slots += `<text class="evo-tot" x="${(colX+slotR+8).toFixed(1)}" y="${(cy+12).toFixed(1)}">${s.total} pts</text>`;
   });
 
-  wrap.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Evolución de puntos por fecha">
-    ${g}${paths}${slots}
+  wrap.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Evolución de puntos">
+    <defs>${defs}</defs>${g}${paths}${slots}
   </svg>`;
 
-  // Leyenda
-  leyenda.innerHTML = orden.map(s=>`<span class="chip"><span class="dot" style="background:${s.color}"></span>${s.n} <b style="color:var(--muted);font-weight:600;">(${s.total})</b></span>`).join("");
-  nota.innerHTML = `📅 ${N} día${N>1?'s':''} con resultados · ${acumular?'puntos acumulados':'puntos por día'}. ` +
-    `Los círculos de la derecha son los <b>slots para las caritas</b> (cada &lt;g class="evo-carita"&gt; tiene <code>data-jugador</code> para que sepas de quién es).`;
+  leyenda.innerHTML = orden.map(s=>`<span class="chip"><span class="dot" style="background:${s.color}"></span>${evoEsc(s.n)} <b style="color:var(--muted);font-weight:600;">(${s.total})</b></span>`).join("");
+  nota.innerHTML = `📅 <b>${per.et}</b> · ${N} día${N>1?'s':''} con resultados · ${acumular?'puntos acumulados':'puntos por día'}.`;
+}
+
+/* ====== FOTOS DE LAS CARITAS ====== */
+function renderEvoFotos(){
+  const cont = document.getElementById("evo-fotos"); if(!cont) return;
+  const names = Object.keys(DB.preds||{});
+  if(!names.length){ cont.innerHTML="<p class='hint'>Cuando haya participantes aparecerán aquí para ponerles foto.</p>"; return; }
+  const fotos = DB.caritas||{};
+  cont.innerHTML = names.sort((a,b)=>a.localeCompare(b)).map(n=>{
+    const f = fotos[n];
+    const safe = n.replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'&quot;');
+    return `<div class="evo-foto-row">
+      <div class="evo-foto-prev">${f?`<img src="${f}" alt="">`:`<span>${evoEsc((n.trim()[0]||"?").toUpperCase())}</span>`}</div>
+      <div class="evo-foto-name">${evoEsc(n)}</div>
+      <label class="evo-foto-btn">📷 ${f?"Cambiar":"Subir foto"}
+        <input type="file" accept="image/*" style="display:none" onchange="subirCarita(this,'${safe}')">
+      </label>
+      ${f?`<button class="mini danger" onclick="quitarCarita('${safe}')">✕</button>`:""}
+    </div>`;
+  }).join("");
+}
+function subirCarita(input, nombre){
+  const file = input.files && input.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = e=>{
+    const img = new Image();
+    img.onload = async ()=>{
+      // recortar a cuadrado y reducir a 96px para que pese poco
+      const S=96, c=document.createElement("canvas"); c.width=S; c.height=S;
+      const ctx=c.getContext("2d");
+      const lado=Math.min(img.width,img.height);
+      const sx=(img.width-lado)/2, sy=(img.height-lado)/2;
+      ctx.drawImage(img, sx,sy,lado,lado, 0,0,S,S);
+      const dataURL=c.toDataURL("image/jpeg",0.82);
+      await guardarCarita(nombre, dataURL);
+    };
+    img.src=e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+async function guardarCarita(nombre, dataURL){
+  DB.caritas = DB.caritas||{};
+  DB.caritas[nombre]=dataURL;
+  if(sb){
+    const {error}=await sbUpsert("carita", nombre, {img:dataURL});
+    if(error){ toast("No se pudo guardar la foto en la nube",true); }
+    else toast("Foto guardada ✓");
+  } else {
+    const l=loadLocal(); l.DB=l.DB||{}; l.DB.caritas=DB.caritas; saveLocal(l);
+    toast("Foto guardada (solo este equipo)");
+  }
+  renderEvolucion();
+}
+async function quitarCarita(nombre){
+  if(DB.caritas) delete DB.caritas[nombre];
+  if(sb){ await sbDelete("carita", nombre); }
+  else { const l=loadLocal(); if(l.DB?.caritas){ delete l.DB.caritas[nombre]; saveLocal(l); } }
+  toast("Foto quitada");
+  renderEvolucion();
 }
 
 /* ============ INIT ============ */
