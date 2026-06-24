@@ -300,7 +300,25 @@
         </div>
         <p class="hint" style="margin-top:8px;">Los partidos que agregues aquí se guardan en la nube y les aparecen a todos automáticamente.</p>
       </details>
-      <button onclick="guardarResultados()" style="margin-top:12px;">💾 Guardar resultados de esta jornada</button>
+      <button class="sec" onclick="traerResultadosAPI(aSel)" style="margin-top:12px;">⚽ Traer marcadores (90') de este día</button>
+      <div id="a-api-log" class="hint" style="margin-top:8px;"></div>
+      <button onclick="guardarResultados()" style="margin-top:6px;">💾 Guardar resultados de esta jornada</button>
+      <p class="hint" style="margin-top:6px;">El botón <b>Traer marcadores</b> llena los resultados solo (revísalos); luego dale <b>Guardar</b> para publicarlos.</p>
+    </div>
+
+    <div class="card">
+      <h2>⚽ Resultados automáticos (API-Football)</h2>
+      <p class="hint">Pega tu clave gratis de API-Football. Con eso, el botón “Traer marcadores” trae el resultado de cada partido del día (marcador a los 90 min). La clave se guarda <b>solo en este equipo</b>.</p>
+      <label>API key</label>
+      <input type="text" id="a-apikey" placeholder="tu clave de api-football" autocomplete="off">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
+        <button class="mini sec" onclick="guardarApiKey()">Guardar clave</button>
+        <button class="mini" onclick="probarAPI()">Probar conexión</button>
+      </div>
+      <div id="a-apikey-log" class="hint" style="margin-top:8px;"></div>
+      <details style="margin-top:8px;"><summary>¿Cómo consigo la clave gratis?</summary>
+        <p class="hint" style="margin-top:6px;">1) Entra a <b>dashboard.api-football.com</b> y regístrate (gratis). 2) En tu panel copia la <b>API key</b>. 3) Pégala arriba y dale <b>Guardar clave</b>. El plan gratis da 100 consultas al día — de sobra para traer los resultados de cada día.</p>
+      </details>
     </div>
 
     <div class="card">
@@ -868,6 +886,7 @@ function renderAdminJornada(){
   renderPartidosForm("a", aSel, document.getElementById("a-partidos"));
   const r=DB.res?.[aSel];
   if(r) r.forEach((m,i)=>{ if(m){setv("a-m"+i+"a",m[0]); setv("a-m"+i+"b",m[1]);} });
+  const ak=document.getElementById("a-apikey"); if(ak && !ak.value) ak.value=apiKey();
 }
 async function agregarPartido(){
   const e1=val("a-eq1"), e2=val("a-eq2");
@@ -1425,6 +1444,120 @@ async function quitarCarita(nombre){
   else { const l=loadLocal(); if(l.DB?.caritas){ delete l.DB.caritas[nombre]; saveLocal(l); } }
   toast("Foto quitada");
   renderEvolucion();
+}
+
+/* ============ RESULTADOS AUTOMÁTICOS (API-Football) ============
+   Semiautomático: trae el marcador a los 90' y llena el formulario del admin.
+   La organizadora revisa y le da "Guardar". La clave se guarda solo local. */
+const API_HOST = "https://v3.football.api-sports.io";
+const API_LEAGUE = 1;      // Copa del Mundo
+const API_SEASON = 2026;
+function apiKey(){ try{ return localStorage.getItem("polla_apikey")||""; }catch(e){ return ""; } }
+function guardarApiKey(){
+  const v=(document.getElementById("a-apikey")?.value||"").trim();
+  try{ localStorage.setItem("polla_apikey", v); }catch(e){}
+  const log=document.getElementById("a-apikey-log");
+  if(log) log.innerHTML = v? "Clave guardada en este equipo ✓" : "Clave borrada.";
+}
+async function probarAPI(){
+  const log=document.getElementById("a-apikey-log");
+  const key=(document.getElementById("a-apikey")?.value||"").trim()||apiKey();
+  if(!key){ if(log) log.innerHTML="<span class='warn'>Primero pega tu API key.</span>"; return; }
+  if(log) log.innerHTML="Probando conexión…";
+  try{
+    const r=await fetch(API_HOST+"/status",{headers:{"x-apisports-key":key}});
+    const j=await r.json();
+    if(j?.response?.requests){
+      const q=j.response.requests;
+      if(log) log.innerHTML=`Conectado ✓ Plan: <b>${j.response.subscription?.plan||"—"}</b>. Consultas hoy: ${q.current}/${q.limit_day}.`;
+    } else if(j?.errors && Object.keys(j.errors).length){
+      if(log) log.innerHTML="<span class='warn'>Error: "+Object.values(j.errors).join(" · ")+"</span>";
+    } else { if(log) log.innerHTML="<span class='warn'>Respuesta inesperada. ¿Clave correcta?</span>"; }
+  }catch(e){
+    if(log) log.innerHTML="<span class='warn'>No se pudo conectar (posible CORS o sin internet). Detalle: "+e.message+"</span>";
+  }
+}
+/* Normaliza un nombre de equipo: sin acentos, minúsculas, solo letras/números */
+function normTeam(s){ return (s||"").normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase().replace(/[^a-z0-9]/g,""); }
+/* Alias ES (app) -> posibles nombres que devuelve la API (en inglés/variantes) */
+const EQ_API = {
+  "México":["Mexico"], "Sudáfrica":["South Africa"], "Corea del Sur":["South Korea","Korea Republic","Korea South"],
+  "Chequia":["Czech Republic","Czechia"], "Canadá":["Canada"],
+  "Bosnia y Herzegovina":["Bosnia and Herzegovina","Bosnia & Herzegovina","Bosnia-Herzegovina","Bosnia"],
+  "Catar":["Qatar"], "Suiza":["Switzerland"], "Brasil":["Brazil"], "Marruecos":["Morocco"], "Haití":["Haiti"],
+  "Escocia":["Scotland"], "Estados Unidos":["USA","United States","United States of America"], "Paraguay":["Paraguay"],
+  "Australia":["Australia"], "Turquía":["Turkey","Turkiye","Türkiye"], "Alemania":["Germany"], "Curazao":["Curacao","Curaçao"],
+  "Costa de Marfil":["Ivory Coast","Cote d'Ivoire","Côte d'Ivoire"], "Ecuador":["Ecuador"],
+  "Países Bajos":["Netherlands","Holland"], "Japón":["Japan"], "Suecia":["Sweden"], "Túnez":["Tunisia"],
+  "Bélgica":["Belgium"], "Egipto":["Egypt"], "Irán":["Iran","Iran Islamic Republic"], "Nueva Zelanda":["New Zealand"],
+  "España":["Spain"], "Cabo Verde":["Cape Verde","Cabo Verde"], "Arabia Saudí":["Saudi Arabia"], "Uruguay":["Uruguay"],
+  "Francia":["France"], "Senegal":["Senegal"], "Irak":["Iraq"], "Noruega":["Norway"], "Argentina":["Argentina"],
+  "Argelia":["Algeria"], "Austria":["Austria"], "Jordania":["Jordan"], "Portugal":["Portugal"],
+  "RD Congo":["DR Congo","Congo DR","Democratic Republic of Congo","Congo Democratic Republic","DR Congo (Zaire)"],
+  "Uzbekistán":["Uzbekistan"], "Colombia":["Colombia"], "Inglaterra":["England"], "Croacia":["Croatia"],
+  "Ghana":["Ghana"], "Panamá":["Panama"]
+};
+let _eqIndex=null;
+function eqIndex(){
+  if(_eqIndex) return _eqIndex;
+  _eqIndex={};
+  for(const [app, aliases] of Object.entries(EQ_API)){
+    _eqIndex[normTeam(app)]=app;
+    aliases.forEach(a=>{ _eqIndex[normTeam(a)]=app; });
+  }
+  return _eqIndex;
+}
+function apiTeamToApp(apiName){ return eqIndex()[normTeam(apiName)] || null; }
+
+async function traerResultadosAPI(jid){
+  const log=document.getElementById("a-api-log");
+  const key=(document.getElementById("a-apikey")?.value||"").trim()||apiKey();
+  const j=DIAS.find(d=>d.id===jid);
+  const ps=getPartidos(jid);
+  if(!key){ if(log) log.innerHTML="<span class='warn'>Pega tu API key abajo y dale Guardar clave.</span>"; return; }
+  if(!ps.length){ if(log) log.innerHTML="<span class='warn'>Este día no tiene partidos cargados todavía.</span>"; return; }
+  if(log) log.innerHTML=`Consultando partidos del ${j.fecha}…`;
+  let data;
+  try{
+    const r=await fetch(`${API_HOST}/fixtures?league=${API_LEAGUE}&season=${API_SEASON}&date=${j.fecha}`,{headers:{"x-apisports-key":key}});
+    data=await r.json();
+  }catch(e){
+    if(log) log.innerHTML="<span class='warn'>No se pudo conectar (posible CORS o sin internet): "+e.message+"</span>"; return;
+  }
+  if(data?.errors && Object.keys(data.errors).length){
+    if(log) log.innerHTML="<span class='warn'>API: "+Object.values(data.errors).join(" · ")+"</span>"; return;
+  }
+  const fixtures=data?.response||[];
+  if(!fixtures.length){ if(log) log.innerHTML=`La API no devolvió partidos para el ${j.fecha}. (¿Aún no se juegan o no hay cobertura todavía?)`; return; }
+
+  const FIN=["FT","AET","PEN"]; // terminado
+  let llenos=0, pendientes=[], noMatch=[];
+  ps.forEach((p,i)=>{
+    const home=p[0], away=p[1];
+    let hit=null, swap=false;
+    for(const f of fixtures){
+      const fh=apiTeamToApp(f.teams?.home?.name), fa=apiTeamToApp(f.teams?.away?.name);
+      if(fh===home && fa===away){ hit=f; swap=false; break; }
+      if(fh===away && fa===home){ hit=f; swap=true; break; }
+    }
+    if(!hit){ noMatch.push(`${home} vs ${away}`); return; }
+    const st=hit.fixture?.status?.short;
+    if(!FIN.includes(st)){ pendientes.push(`${home} vs ${away} (${hit.fixture?.status?.short||"?"})`); return; }
+    // Marcador a los 90': score.fulltime (en API-Football es el resultado a 90', sin prórroga ni penales)
+    let gh = hit.score?.fulltime?.home, ga = hit.score?.fulltime?.away;
+    if(gh==null || ga==null){ gh=hit.goals?.home; ga=hit.goals?.away; }
+    if(gh==null || ga==null){ pendientes.push(`${home} vs ${away} (sin marcador)`); return; }
+    const localGoals = swap? ga : gh;
+    const visitaGoals = swap? gh : ga;
+    setv("a-m"+i+"a", localGoals);
+    setv("a-m"+i+"b", visitaGoals);
+    llenos++;
+  });
+
+  let msg=`✅ Llené <b>${llenos}</b> de ${ps.length} partido(s) a 90'. Revisa y dale <b>💾 Guardar</b>.`;
+  if(pendientes.length) msg+=`<br>⏳ Aún no terminados: ${pendientes.join(", ")}.`;
+  if(noMatch.length) msg+=`<br>❓ No pude emparejar (revisa el nombre): ${noMatch.join(", ")}.`;
+  if(log) log.innerHTML=msg;
 }
 
 /* ============ INIT ============ */
