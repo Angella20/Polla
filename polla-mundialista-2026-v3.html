@@ -1,0 +1,1376 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>⚽ Polla Mundialista 2026 — v3 en la nube</title>
+<style>
+  :root{
+    --bg:#0d1321; --card:#1d2d44; --card2:#16243a; --accent:#f4d35e; --accent2:#3e92cc;
+    --text:#f0ebd8; --muted:#9fb3c8; --ok:#7bc950; --bad:#e94f37; --border:#2e4057;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{font-family:'Segoe UI',system-ui,sans-serif; background:var(--bg); color:var(--text); padding-bottom:60px;}
+  header{background:linear-gradient(135deg,#1d2d44,#0d1321); padding:20px 14px 12px; text-align:center; border-bottom:3px solid var(--accent);}
+  header h1{font-size:1.45rem;}
+  header p{color:var(--muted); font-size:.82rem; margin-top:4px;}
+  .tabs{display:flex; justify-content:center; gap:8px; margin:14px auto 0; flex-wrap:wrap;}
+  .tab{background:var(--card); border:1px solid var(--border); color:var(--text); padding:9px 16px; border-radius:20px; cursor:pointer; font-size:.88rem; font-weight:600;}
+  .tab.active{background:var(--accent); color:#0d1321; border-color:var(--accent);}
+  main{max-width:820px; margin:0 auto; padding:14px;}
+  .panel{display:none;} .panel.active{display:block;}
+  .card{background:var(--card); border:1px solid var(--border); border-radius:12px; padding:16px; margin:14px 0;}
+  .card h2{font-size:1.02rem; color:var(--accent); margin-bottom:4px;}
+  .hint{font-size:.78rem; color:var(--muted); margin-bottom:10px;}
+  label{font-size:.75rem; color:var(--muted); display:block; margin-top:8px;}
+  select,input[type=text],input[type=password],input[type=number],input[type=date],textarea{
+    width:100%; padding:8px; border-radius:8px; border:1px solid var(--border);
+    background:#0d1321; color:var(--text); font-size:.85rem; margin-top:3px;
+  }
+  input[type=number]{width:52px; text-align:center; -moz-appearance:textfield;}
+  input::-webkit-outer-spin-button,input::-webkit-inner-spin-button{-webkit-appearance:none;}
+  .partido{display:flex; align-items:center; justify-content:space-between; gap:8px; padding:10px 4px; border-bottom:1px dashed var(--border); flex-wrap:wrap;}
+  .partido:last-child{border-bottom:none;}
+  .partido .nombre{flex:1; min-width:160px; font-size:.86rem;}
+  .partido .fecha{font-size:.68rem; color:var(--muted); display:block;}
+  .marcador{display:flex; align-items:center; gap:6px;}
+  .marcador span{color:var(--muted);}
+  button{background:var(--accent); color:#0d1321; border:none; padding:11px 20px; border-radius:10px; font-weight:700; font-size:.92rem; cursor:pointer; margin-top:10px;}
+  button.sec{background:var(--accent2); color:#fff;} button.danger{background:var(--bad); color:#fff;}
+  button.mini{padding:5px 10px; font-size:.75rem; margin:0;}
+  button:active{transform:scale(.97);}
+  button:disabled{opacity:.5; cursor:not-allowed;}
+  table{width:100%; border-collapse:collapse; margin-top:10px; font-size:.84rem;}
+  th,td{padding:8px 7px; text-align:left; border-bottom:1px solid var(--border);}
+  th{color:var(--accent2); font-size:.73rem; text-transform:uppercase;}
+  tr.pos1 td{color:var(--accent); font-weight:700;}
+  .pill{display:inline-block; background:var(--card2); border:1px solid var(--border); border-radius:12px; padding:2px 10px; font-size:.72rem; margin:2px; color:var(--muted);}
+  .jorn-grid{display:flex; gap:8px; flex-wrap:wrap; margin:10px 0;}
+  .jorn-btn{background:var(--card2); border:1px solid var(--border); color:var(--muted); padding:8px 12px; border-radius:10px; cursor:pointer; font-size:.78rem; text-align:center; min-width:86px;}
+  .jorn-btn b{display:block; color:var(--text); font-size:.85rem;}
+  .jorn-btn.activa{border-color:var(--accent); color:var(--accent);}
+  .jorn-btn.activa b{color:var(--accent);}
+  .jorn-btn.hoy{box-shadow:0 0 0 2px var(--ok);}
+  .badge-pts{background:var(--accent); color:#0d1321; border-radius:10px; padding:1px 8px; font-size:.7rem; font-weight:700;}
+  .badge-hoy{background:var(--ok); color:#0d1321; border-radius:10px; padding:1px 8px; font-size:.68rem; font-weight:700;}
+  details{margin-top:8px;} summary{cursor:pointer; color:var(--accent2); font-size:.85rem;}
+  .reglas li{margin:6px 0 6px 18px; font-size:.85rem;}
+  .ok{color:var(--ok);} .warn{color:var(--bad); font-size:.8rem;}
+  .toast{position:fixed; bottom:16px; left:50%; transform:translateX(-50%); background:var(--ok); color:#0d1321; padding:10px 20px; border-radius:20px; font-weight:700; display:none; z-index:99; max-width:90%; text-align:center;}
+  .flexrow{display:flex; gap:8px; align-items:flex-end; flex-wrap:wrap;}
+  .flexrow>div{flex:1; min-width:120px;}
+  .estado{font-size:.72rem; padding:3px 10px; border-radius:12px; display:inline-block;}
+  .estado.on{background:rgba(123,201,80,.18); color:var(--ok);}
+  .estado.off{background:rgba(233,79,55,.18); color:var(--bad);}
+  .setup-banner{background:rgba(233,79,55,.12); border:1px solid var(--bad); border-radius:10px; padding:12px; margin:14px; font-size:.82rem;}
+  .setup-banner b{color:var(--bad);}
+  .evo-toolbar{display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin:6px 0 10px;}
+  .evo-leyenda{display:flex; flex-wrap:wrap; gap:6px 12px; margin:8px 0 4px;}
+  .evo-leyenda .chip{display:inline-flex; align-items:center; gap:6px; font-size:.78rem; color:var(--text);}
+  .evo-leyenda .chip .dot{width:12px; height:12px; border-radius:50%; flex:none;}
+  .evo-chart-wrap{overflow-x:auto; overflow-y:hidden; -webkit-overflow-scrolling:touch; padding-bottom:6px;}
+  .evo-chart-wrap svg{display:block;}
+  .evo-grid{stroke:var(--border); stroke-width:1;}
+  .evo-axis{fill:var(--muted); font-size:11px;}
+  .evo-line{fill:none; stroke-width:2.5; stroke-linejoin:round; stroke-linecap:round;}
+  .evo-pt{stroke:var(--bg); stroke-width:1.5;}
+  .evo-leader{stroke-dasharray:3 3; stroke-width:1.2; opacity:.6;}
+  .evo-name{fill:var(--text); font-size:12px; font-weight:600;}
+  .evo-tot{fill:var(--muted); font-size:11px;}
+  .evo-slot-init{fill:#0d1321; font-size:13px; font-weight:800; text-anchor:middle; dominant-baseline:central;}
+</style>
+</head>
+<body>
+<header>
+  <h1>⚽ POLLA 2026 · EN LA NUBE</h1>
+  <p id="hdr-sub">Canadá · México · EE.UU. | 11 jun – 19 jul</p>
+  <p style="margin-top:6px;"><span id="conn-estado" class="estado off">● conectando…</span> <span class="hint" id="polla-id-lbl" style="display:inline;"></span></p>
+  <div class="tabs">
+    <div class="tab active" data-p="reglas">📜 Reglas</div>
+    <div class="tab" data-p="jugar">✏️ Predecir</div>
+    <div class="tab" data-p="resultados">👁️ Resultados</div>
+    <div class="tab" data-p="ranking">🏆 Ranking</div>
+    <div class="tab" data-p="evolucion">📈 Evolución</div>
+    <div class="tab" data-p="admin">🔑 Admin</div>
+  </div>
+</header>
+
+<div id="setup-banner" class="setup-banner" style="display:none;">
+  <b>⚠️ Falta configurar Supabase.</b> Esta polla todavía no está conectada a la nube.
+  Abre el archivo y rellena <code>SUPABASE_URL</code> y <code>SUPABASE_ANON_KEY</code> arriba del script
+  (mira la guía <code>GUIA-INSTALACION.md</code>). Mientras tanto, los datos se guardan solo en este dispositivo.
+</div>
+
+<main>
+
+<!-- ================= REGLAS ================= -->
+<div class="panel active" id="p-reglas">
+  <div class="card">
+    <h2>Cómo funciona (v3)</h2>
+    <ul class="reglas">
+      <li>🌐 Todos entran al <b>mismo link</b> y marcan sus predicciones directo. Ya <b>no hay que mandar códigos</b> por WhatsApp.</li>
+      <li>🔑 Ahora cada quien entra con <b>su nombre y su contraseña</b>. La organizadora te asigna la clave; si no la tienes, pídesela. Tu sesión queda guardada en tu equipo.</li>
+      <li>📅 Se apuesta <b>cada día</b> que hay partidos. La web detecta sola el día de hoy.</li>
+      <li>✏️ Entras a <b>Predecir</b>, llenas los marcadores del día y le das <b>Guardar</b>. Listo, queda en la nube.</li>
+      <li>⏱️ <b>Puedes cambiar tu predicción hasta 5 minutos después de que arranca cada partido.</b> Pasado ese momento, ese partido se cierra solo (los demás del día siguen abiertos hasta su propia hora).</li>
+      <li>👁️ En <b>Resultados</b> puedes ver los pronósticos de los demás, pero <b>solo de los partidos que ya cerraron</b>. Mientras un partido sigue abierto, nadie ve lo que apostaron los otros.</li>
+      <li>🗓️ Los días de grupos se agrupan en <b>Fechas</b> (Fecha 1: 11–17 jun · Fecha 2: 18–23 jun · Fecha 3: 24–27 jun). Hay un <b>ganador por Fecha</b> (quien más puntos hizo dentro de esa Fecha).</li>
+      <li>🏆 En <b>Ranking</b> verás el <b>acumulado general</b> de todo el torneo y también el <b>ranking por Fecha</b> (cada Fecha cuenta aparte, desde 0).</li>
+      <li>🔄 La organizadora ingresa los resultados y los puntajes <b>se calculan solos</b> para todos.</li>
+      <li>💰 El pozo "revienta" en cada fase eliminatoria: lo gana quien más puntos sumó <b>dentro de esa fase</b> (no el acumulado). Si hay empate, se reparte.</li>
+      <li>🏆 La primera vez que predices eliges tu <b>campeón del mundo</b> (vale 10 pts al final, no se puede cambiar).</li>
+    </ul>
+  </div>
+  <div class="card">
+    <h2>Puntaje</h2>
+    <p class="hint" style="margin-bottom:6px;"><b>Desde la Fecha 2 (18 jun)</b> rige este sistema. Solo cuenta el de mayor valor que apliques:</p>
+    <ul class="reglas">
+      <li><span class="badge-pts">5 pts</span> Marcador exacto (ej. predices 2-0 y queda 2-0).</li>
+      <li><span class="badge-pts">3 pts</span> Diferencia de goles correcta (ej. predices 3-1 y queda 2-0: ambos +2). Un empate con otro marcador, p.ej. 1-1 vs 0-0, también cuenta aquí (diferencia 0).</li>
+      <li><span class="badge-pts">2 pts</span> Solo aciertas el ganador o el empate (sin acertar la diferencia).</li>
+      <li><span class="badge-pts">0 pts</span> No aciertas ni ganador ni empate.</li>
+      <li><span class="badge-pts">10 pts</span> Campeón del mundo (se paga al final).</li>
+    </ul>
+    <p class="hint" style="margin-top:8px;">📌 La <b>Fecha 1</b> (11–17 jun) ya cerró con su sistema original (3 pts exacto · 1 pt ganador) y su ganador quedó definido; no se recalcula. En eliminatorias cuenta el resultado en 90' (el empate vale aunque haya penales). Desempate del ranking: más marcadores exactos; luego, quien acertó al campeón.</p>
+  </div>
+  <div class="card">
+    <h2>Calendario día por día</h2>
+    <div id="reglas-jornadas"></div>
+  </div>
+</div>
+
+<!-- ================= PREDECIR ================= -->
+<div class="panel" id="p-jugar">
+
+  <!-- Login del participante -->
+  <div class="card" id="j-login-card">
+    <h2>🔑 Ingresar</h2>
+    <p class="hint">Escribe tu nombre y tu contraseña para predecir. Si todavía no tienes contraseña, pídesela a la organizadora.</p>
+    <label>Tu nombre</label>
+    <input type="text" id="j-login-nombre" placeholder="Ej: Angella" maxlength="20" autocomplete="username">
+    <label>Contraseña</label>
+    <input type="password" id="j-login-pass" placeholder="••••" autocomplete="current-password">
+    <button onclick="loginParticipante()">Entrar</button>
+    <p class="warn" id="j-login-msg" style="margin-top:8px;"></p>
+  </div>
+
+  <!-- Zona visible solo tras iniciar sesión -->
+  <div id="j-zona" style="display:none;">
+    <div class="card">
+      <h2>Tu cuenta</h2>
+      <p class="hint" id="j-saludo"></p>
+      <label>🏆 Tu campeón del mundo (solo la primera vez)</label>
+      <select id="j-campeon"></select>
+      <p class="hint" id="j-campeon-info" style="margin-top:6px;"></p>
+      <button class="mini sec" onclick="logoutParticipante()" style="margin-top:10px;">Cerrar sesión</button>
+    </div>
+    <div class="card">
+      <h2>Elige el día</h2>
+      <div class="jorn-grid" id="j-jornadas"></div>
+      <p class="hint" id="j-jorn-info"></p>
+      <div id="j-partidos"></div>
+      <p class="hint" id="j-sin-partidos" style="display:none;">Este día aún no tiene partidos cargados (eliminatorias: los cruces se conocen al cerrar la fase anterior). La organizadora los carga desde Admin y aparecerán solos aquí.</p>
+    </div>
+    <div class="card">
+      <h2>Guardar predicción</h2>
+      <button id="j-btn-guardar" onclick="guardarPrediccion()">💾 Guardar mi predicción del día</button>
+      <p class="hint" id="j-aviso" style="margin-top:8px;"></p>
+    </div>
+    <div class="card">
+      <h2>📋 Mis pronósticos</h2>
+      <p class="hint">Aquí ves todo lo que has marcado y cuántos puntos llevas.</p>
+      <div id="j-mis"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= RESULTADOS DE PARTICIPANTES ================= -->
+<div class="panel" id="p-resultados">
+  <div class="card" id="res-login-aviso" style="display:none;">
+    <h2>👁️ Resultados de participantes</h2>
+    <p class="hint">Inicia sesión en la pestaña <b>✏️ Predecir</b> para poder ver los pronósticos de los demás.</p>
+  </div>
+  <div id="res-zona" style="display:none;">
+    <div class="card">
+      <h2>👁️ Pronósticos de participantes <button class="mini sec" style="float:right" onclick="cargarTodo(true)">🔄 Actualizar</button></h2>
+      <p class="hint">Solo puedes ver el pronóstico de los demás en los partidos que <b>ya cerraron</b> (5 min después del pitazo). Mientras un partido sigue abierto, los pronósticos permanecen ocultos.</p>
+      <div class="jorn-grid" id="res-jornadas"></div>
+      <p class="hint" id="res-info"></p>
+      <div id="res-detalle"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= RANKING ================= -->
+<div class="panel" id="p-ranking">
+  <div class="card">
+    <h2>🏆 Ranking acumulado general <button class="mini sec" style="float:right" onclick="cargarTodo(true)">🔄 Actualizar</button></h2>
+    <p class="hint">Suma de todos los puntos de todo el torneo.</p>
+    <div id="r-tabla"></div>
+  </div>
+  <div class="card">
+    <h2>📅 Ranking por Fecha / Fase</h2>
+    <p class="hint">Cada Fecha (o fase eliminatoria) se cuenta por separado, empezando desde 0. Los puntos de una fecha no se suman con los de otra.</p>
+    <div class="jorn-grid" id="r-periodos"></div>
+    <div id="r-periodo-tabla"></div>
+  </div>
+  <div class="card">
+    <h2>💰 Pozos por fase</h2>
+    <div id="r-jornadas"></div>
+  </div>
+</div>
+
+<!-- ================= EVOLUCIÓN ================= -->
+<div class="panel" id="p-evolucion">
+  <div class="card">
+    <h2>📈 Evolución de puntos por fecha <button class="mini sec" style="float:right" onclick="cargarTodo(true)">🔄 Actualizar</button></h2>
+    <p class="hint">Puntos <b>acumulados</b> de cada participante, día por día. Cada línea termina en un círculo: ahí va su carita. 🙂</p>
+    <div class="evo-toolbar">
+      <label style="display:inline-flex;align-items:center;gap:6px;font-size:.78rem;margin:0;">
+        <input type="checkbox" id="evo-acum" checked style="width:auto;margin:0;"> Acumulado
+      </label>
+      <span class="hint" style="margin:0;">·</span>
+      <label style="display:inline-flex;align-items:center;gap:6px;font-size:.78rem;margin:0;">
+        <input type="checkbox" id="evo-caritas" checked style="width:auto;margin:0;"> Mostrar slots de caritas
+      </label>
+    </div>
+    <div id="evo-leyenda" class="evo-leyenda"></div>
+    <div id="evo-chart-wrap" class="evo-chart-wrap"></div>
+    <p class="hint" id="evo-nota" style="margin-top:8px;"></p>
+  </div>
+</div>
+
+<!-- ================= ADMIN ================= -->
+<div class="panel" id="p-admin">
+  <div class="card" id="admin-login">
+    <h2>Acceso de organizadora</h2>
+    <p class="hint">Solo la organizadora ingresa resultados y carga los cruces de eliminatorias.</p>
+    <label>PIN de admin</label>
+    <input type="password" id="a-pin" placeholder="••••">
+    <button onclick="entrarAdmin()">Entrar</button>
+  </div>
+
+  <div id="admin-zona" style="display:none;">
+    <div class="card">
+      <h2>Participantes</h2>
+      <div id="a-participantes"></div>
+    </div>
+
+    <div class="card">
+      <h2>🔐 Usuarios y contraseñas</h2>
+      <p class="hint">Asigna o restablece la contraseña de cada participante (mínimo 3 caracteres). Sin contraseña, el participante no puede iniciar sesión para predecir.</p>
+      <div id="a-usuarios"></div>
+      <details style="margin-top:12px;"><summary>➕ Crear cuenta nueva</summary>
+        <div class="flexrow" style="margin-top:8px;">
+          <div><label>Nombre</label><input type="text" id="a-nuevo-nombre" maxlength="20" placeholder="Ej: Carlos"></div>
+          <div><label>Contraseña</label><input type="text" id="a-nuevo-pass" placeholder="clave inicial"></div>
+          <button class="mini sec" onclick="adminCrearCuenta()">Crear</button>
+        </div>
+        <p class="hint" style="margin-top:8px;">Útil para registrar a alguien que aún no ha entrado nunca.</p>
+      </details>
+    </div>
+
+    <div class="card">
+      <h2>Jornadas: partidos y resultados</h2>
+      <div class="jorn-grid" id="a-jornadas"></div>
+      <p class="hint" id="a-jorn-info"></p>
+      <p class="hint" style="margin-top:4px;">⏰ La casilla <b>HH:MM</b> de cada partido es su <b>hora de inicio</b> (huso del torneo). Cada predicción se cierra sola <b>5 min después</b> de esa hora. Déjala vacía si aún no la sabes.</p>
+      <div id="a-partidos"></div>
+      <button class="sec" onclick="guardarHorarios()" style="margin-top:10px;">⏰ Guardar horarios de esta jornada</button>
+      <details style="margin-top:10px;"><summary>➕ Agregar / editar partidos de esta jornada</summary>
+        <div class="flexrow" style="margin-top:8px;">
+          <div><label>Equipo local</label><select id="a-eq1"></select></div>
+          <div><label>Equipo visita</label><select id="a-eq2"></select></div>
+          <div><label>Detalle (opcional)</label><input type="text" id="a-det" placeholder="Ej: 14 jun · Octavos"></div>
+          <button class="mini sec" onclick="agregarPartido()">Agregar</button>
+        </div>
+        <p class="hint" style="margin-top:8px;">Los partidos que agregues aquí se guardan en la nube y les aparecen a todos automáticamente.</p>
+      </details>
+      <button onclick="guardarResultados()" style="margin-top:12px;">💾 Guardar resultados de esta jornada</button>
+    </div>
+
+    <div class="card">
+      <h2>Campeón real (al final del torneo)</h2>
+      <select id="a-campeon"></select>
+      <button class="mini" style="margin-top:8px;" onclick="guardarCampeon()">Guardar campeón</button>
+    </div>
+
+    <div class="card">
+      <h2>Importar datos de la versión 1</h2>
+      <p class="hint">¿Ya tenías predicciones y resultados en la v1? Abre tu archivo viejo, dale <b>"Exportar respaldo"</b> y sube aquí ese JSON. Se subirán a la nube las predicciones, los campeones de cada quien, los resultados y los partidos cargados.</p>
+      <input type="file" id="a-v1-file" accept=".json" style="display:none" onchange="importarV1(this)">
+      <button class="sec" onclick="document.getElementById('a-v1-file').click()">⬇️ Subir respaldo de la v1</button>
+      <div id="a-v1-log" class="hint" style="margin-top:8px;"></div>
+    </div>
+
+    <div class="card">
+      <h2>Respaldo (v2)</h2>
+      <button class="sec" onclick="exportarTodo()">⬆️ Exportar respaldo (JSON)</button>
+    </div>
+  </div>
+</div>
+
+</main>
+<div class="toast" id="toast"></div>
+
+<!-- ====== Cliente de Supabase (CDN) ====== -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+/* ==========================================================================
+   ⚙️ CONFIGURACIÓN — Angie, rellena estas 3 líneas UNA sola vez
+   --------------------------------------------------------------------------
+   1) SUPABASE_URL y SUPABASE_ANON_KEY los copias de tu proyecto en Supabase
+      (Project Settings → API). Mira GUIA-INSTALACION.md.
+   2) ADMIN_PIN es la clave para que solo tú puedas ingresar resultados.
+   3) El "id de tu polla" sale del link: ?id=loquesea  (si no, usa POLLA_ID_DEFAULT)
+   ========================================================================== */
+const SUPABASE_URL      = "https://zbpfgfnpmeoalovbxnjb.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpicGZnZm5wbWVvYWxvdmJ4bmpiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE1NzE3NzgsImV4cCI6MjA5NzE0Nzc3OH0.Z3QA6fX6fQz2jLjDbWV8zOO1FQ5NLbrU5oHdDmiS2cE";
+const ADMIN_PIN         = "2026";                       // cámbialo por el tuyo
+const POLLA_ID_DEFAULT  = "mundial2026";                // id por defecto si el link no trae ?id=
+
+/* id de la polla: permite varias pollas con el mismo archivo usando ?id=  */
+const POLLA_ID = (new URLSearchParams(location.search).get("id") || POLLA_ID_DEFAULT)
+                   .toLowerCase().replace(/[^a-z0-9_-]/g,"").slice(0,40) || POLLA_ID_DEFAULT;
+
+const CONFIGURADO = SUPABASE_URL.startsWith("http") && SUPABASE_ANON_KEY.length > 20;
+let sb = null;
+if (CONFIGURADO) { try { sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY); } catch(e){ console.error(e); } }
+
+/* ============ DATOS REALES — Sorteo FIFA 5-dic-2025 ============ */
+const GRUPOS = {
+  A:["México","Sudáfrica","Corea del Sur","Chequia"],
+  B:["Canadá","Bosnia y Herzegovina","Catar","Suiza"],
+  C:["Brasil","Marruecos","Haití","Escocia"],
+  D:["Estados Unidos","Paraguay","Australia","Turquía"],
+  E:["Alemania","Curazao","Costa de Marfil","Ecuador"],
+  F:["Países Bajos","Japón","Suecia","Túnez"],
+  G:["Bélgica","Egipto","Irán","Nueva Zelanda"],
+  H:["España","Cabo Verde","Arabia Saudí","Uruguay"],
+  I:["Francia","Senegal","Irak","Noruega"],
+  J:["Argentina","Argelia","Austria","Jordania"],
+  K:["Portugal","RD Congo","Uzbekistán","Colombia"],
+  L:["Inglaterra","Croacia","Ghana","Panamá"]
+};
+const TODOS = Object.values(GRUPOS).flat().sort((a,b)=>a.localeCompare(b));
+
+/* ====== PUNTAJE ======
+   Fecha 1 (hasta el 17-jun) conserva el sistema viejo 3/1.
+   Desde la Fecha 2 (18-jun en adelante) rige el sistema nuevo 5/3/2/0. */
+const CAMBIO_PUNTAJE = "2026-06-18";                       // desde aquí rige 5/3/2/0
+const PTS_VIEJO = {exacto:3, resultado:1, campeon:10};
+const PTS_NUEVO = {exacto:5, diferencia:3, resultado:2, campeon:10};
+const PTS = PTS_NUEVO;                                      // campeon=10 (común a ambos)
+function ptsDe(fecha){ return (fecha && fecha >= CAMBIO_PUNTAJE) ? PTS_NUEVO : PTS_VIEJO; }
+
+/* ====== ZONA HORARIA DEL TORNEO ======
+   Se usa para cerrar cada partido 5 min después del pitazo inicial.
+   Por defecto Colombia/Perú (UTC-5). Cambia este valor si tu huso es otro. */
+const TZ = "-05:00";
+const GRACIA_MIN = 5;                                       // minutos de gracia tras el pitazo
+
+const FASES = [
+  {id:"GR", nombre:"Fase de grupos",   pozo:false},
+  {id:"R32",nombre:"16avos (R32)",     pozo:true},
+  {id:"R16",nombre:"Octavos",          pozo:true},
+  {id:"QF", nombre:"Cuartos",          pozo:true},
+  {id:"SF", nombre:"Semis y Final",    pozo:true}
+];
+
+/* ====== FECHAS (rondas) de la fase de grupos, con ganador por Fecha ====== */
+const FECHAS = [
+  {id:"F1", nombre:"Fecha 1", rango:"11–17 jun", dias:["D11","D12","D13","D14","D15","D16","D17"]},
+  {id:"F2", nombre:"Fecha 2", rango:"18–23 jun", dias:["D18","D19","D20","D21","D22","D23"]},
+  {id:"F3", nombre:"Fecha 3", rango:"24–27 jun", dias:["D24","D25","D26","D27"]}
+];
+function fechaDeDia(did){ return FECHAS.find(f=>f.dias.includes(did)); }
+
+const DIAS = [
+  {id:"D11", fase:"GR", fecha:"2026-06-11", et:"Jue 11 jun", partidos:[
+    ["México","Sudáfrica","Grupo A · Inaugural, Estadio Azteca"],
+    ["Corea del Sur","Chequia","Grupo A · Guadalajara"]]},
+  {id:"D12", fase:"GR", fecha:"2026-06-12", et:"Vie 12 jun", partidos:[
+    ["Canadá","Bosnia y Herzegovina","Grupo B · Toronto"],
+    ["Estados Unidos","Paraguay","Grupo D · Los Ángeles"]]},
+  {id:"D13", fase:"GR", fecha:"2026-06-13", et:"Sáb 13 jun", partidos:[
+    ["Catar","Suiza","Grupo B"],
+    ["Brasil","Marruecos","Grupo C"],
+    ["Haití","Escocia","Grupo C"],
+    ["Australia","Turquía","Grupo D"]]},
+  {id:"D14", fase:"GR", fecha:"2026-06-14", et:"Dom 14 jun", partidos:[
+    ["Alemania","Curazao","Grupo E"],
+    ["Países Bajos","Japón","Grupo F"],
+    ["Costa de Marfil","Ecuador","Grupo E"],
+    ["Suecia","Túnez","Grupo F"]]},
+  {id:"D15", fase:"GR", fecha:"2026-06-15", et:"Lun 15 jun", partidos:[
+    ["España","Cabo Verde","Grupo H"],
+    ["Bélgica","Egipto","Grupo G"],
+    ["Arabia Saudí","Uruguay","Grupo H"],
+    ["Irán","Nueva Zelanda","Grupo G"]]},
+  {id:"D16", fase:"GR", fecha:"2026-06-16", et:"Mar 16 jun", partidos:[
+    ["Francia","Senegal","Grupo I"],
+    ["Irak","Noruega","Grupo I"],
+    ["Argentina","Argelia","Grupo J"],
+    ["Austria","Jordania","Grupo J"]]},
+  {id:"D17", fase:"GR", fecha:"2026-06-17", et:"Mié 17 jun", partidos:[
+    ["Portugal","RD Congo","Grupo K"],
+    ["Inglaterra","Croacia","Grupo L"],
+    ["Ghana","Panamá","Grupo L"],
+    ["Uzbekistán","Colombia","Grupo K"]]},
+  {id:"D18", fase:"GR", fecha:"2026-06-18", et:"Jue 18 jun", partidos:[
+    ["Chequia","Sudáfrica","Grupo A"],
+    ["Suiza","Bosnia y Herzegovina","Grupo B"],
+    ["Canadá","Catar","Grupo B"],
+    ["México","Corea del Sur","Grupo A"]]},
+  {id:"D19", fase:"GR", fecha:"2026-06-19", et:"Vie 19 jun", partidos:[
+    ["Escocia","Marruecos","Grupo C"],
+    ["Estados Unidos","Australia","Grupo D"],
+    ["Brasil","Haití","Grupo C"],
+    ["Turquía","Paraguay","Grupo D"]]},
+  {id:"D20", fase:"GR", fecha:"2026-06-20", et:"Sáb 20 jun", partidos:[
+    ["Países Bajos","Suecia","Grupo F"],
+    ["Alemania","Costa de Marfil","Grupo E"],
+    ["Ecuador","Curazao","Grupo E"],
+    ["Túnez","Japón","Grupo F"]]},
+  {id:"D21", fase:"GR", fecha:"2026-06-21", et:"Dom 21 jun", partidos:[
+    ["España","Arabia Saudí","Grupo H"],
+    ["Bélgica","Irán","Grupo G"],
+    ["Uruguay","Cabo Verde","Grupo H"],
+    ["Nueva Zelanda","Egipto","Grupo G"]]},
+  {id:"D22", fase:"GR", fecha:"2026-06-22", et:"Lun 22 jun", partidos:[
+    ["Argentina","Austria","Grupo J"],
+    ["Francia","Irak","Grupo I"],
+    ["Noruega","Senegal","Grupo I"],
+    ["Jordania","Argelia","Grupo J"]]},
+  {id:"D23", fase:"GR", fecha:"2026-06-23", et:"Mar 23 jun", partidos:[
+    ["Portugal","Uzbekistán","Grupo K"],
+    ["Inglaterra","Ghana","Grupo L"],
+    ["Panamá","Croacia","Grupo L"],
+    ["Colombia","RD Congo","Grupo K"]]},
+  {id:"D24", fase:"GR", fecha:"2026-06-24", et:"Mié 24 jun", partidos:[
+    ["Suiza","Canadá","Grupo B"],
+    ["Bosnia y Herzegovina","Catar","Grupo B"],
+    ["Escocia","Brasil","Grupo C"],
+    ["Marruecos","Haití","Grupo C"],
+    ["Chequia","México","Grupo A"],
+    ["Sudáfrica","Corea del Sur","Grupo A"]]},
+  {id:"D25", fase:"GR", fecha:"2026-06-25", et:"Jue 25 jun", partidos:[
+    ["Ecuador","Alemania","Grupo E"],
+    ["Curazao","Costa de Marfil","Grupo E"],
+    ["Japón","Suecia","Grupo F"],
+    ["Túnez","Países Bajos","Grupo F"],
+    ["Turquía","Estados Unidos","Grupo D"],
+    ["Paraguay","Australia","Grupo D"]]},
+  {id:"D26", fase:"GR", fecha:"2026-06-26", et:"Vie 26 jun", partidos:[
+    ["Noruega","Francia","Grupo I"],
+    ["Senegal","Irak","Grupo I"],
+    ["Cabo Verde","Arabia Saudí","Grupo H"],
+    ["Uruguay","España","Grupo H"],
+    ["Egipto","Irán","Grupo G"],
+    ["Nueva Zelanda","Bélgica","Grupo G"]]},
+  {id:"D27", fase:"GR", fecha:"2026-06-27", et:"Sáb 27 jun", partidos:[
+    ["Panamá","Inglaterra","Grupo L"],
+    ["Croacia","Ghana","Grupo L"],
+    ["Colombia","Portugal","Grupo K"],
+    ["RD Congo","Uzbekistán","Grupo K"],
+    ["Argelia","Austria","Grupo J"],
+    ["Jordania","Argentina","Grupo J"]]},
+  {id:"D28", fase:"R32", fecha:"2026-06-28", et:"Dom 28 jun", partidos:[]},
+  {id:"D29", fase:"R32", fecha:"2026-06-29", et:"Lun 29 jun", partidos:[]},
+  {id:"D30", fase:"R32", fecha:"2026-06-30", et:"Mar 30 jun", partidos:[]},
+  {id:"D01", fase:"R32", fecha:"2026-07-01", et:"Mié 1 jul", partidos:[]},
+  {id:"D02", fase:"R32", fecha:"2026-07-02", et:"Jue 2 jul", partidos:[]},
+  {id:"D03", fase:"R32", fecha:"2026-07-03", et:"Vie 3 jul", partidos:[]},
+  {id:"D04", fase:"R16", fecha:"2026-07-04", et:"Sáb 4 jul", partidos:[]},
+  {id:"D05", fase:"R16", fecha:"2026-07-05", et:"Dom 5 jul", partidos:[]},
+  {id:"D06", fase:"R16", fecha:"2026-07-06", et:"Lun 6 jul", partidos:[]},
+  {id:"D07", fase:"R16", fecha:"2026-07-07", et:"Mar 7 jul", partidos:[]},
+  {id:"D09", fase:"QF", fecha:"2026-07-09", et:"Jue 9 jul", partidos:[]},
+  {id:"D10", fase:"QF", fecha:"2026-07-10", et:"Vie 10 jul", partidos:[]},
+  {id:"D11J",fase:"QF", fecha:"2026-07-11", et:"Sáb 11 jul", partidos:[]},
+  {id:"D14J",fase:"SF", fecha:"2026-07-14", et:"Mar 14 jul · Semifinal 1", partidos:[]},
+  {id:"D15J",fase:"SF", fecha:"2026-07-15", et:"Mié 15 jul · Semifinal 2", partidos:[]},
+  {id:"D18J",fase:"SF", fecha:"2026-07-18", et:"Sáb 18 jul · 3er puesto", partidos:[]},
+  {id:"D19J",fase:"SF", fecha:"2026-07-19", et:"Dom 19 jul · FINAL", partidos:[]}
+];
+function faseDe(did){ return DIAS.find(d=>d.id===did)?.fase; }
+function nombreFase(fid){ return FASES.find(f=>f.id===fid)?.nombre||fid; }
+
+/* ============ ESTADO EN MEMORIA (se llena desde Supabase) ============
+   DB = {
+     partidos:{ [dia]: [[eq1,eq2,det],...] },   // overrides de eliminatorias
+     res:     { [dia]: [[a,b],...] },            // resultados reales
+     preds:   { [nombre]: { [dia]: [[a,b],...] } },
+     campeones:{ [nombre]: "País" },
+     campeonReal: "País"
+   }
+============================================================ */
+let DB = {partidos:{}, res:{}, preds:{}, campeones:{}, campeonReal:"", horas:{}, auth:{}};
+let cargando = false;
+
+/* localStorage solo para mi borrador / mi nombre local */
+const LSK = "polla2026v2_local_"+POLLA_ID;
+function loadLocal(){ try{return JSON.parse(localStorage.getItem(LSK))||{};}catch(e){return {};} }
+function saveLocal(s){ localStorage.setItem(LSK, JSON.stringify(s)); }
+
+/* ============ SESIÓN / AUTENTICACIÓN ============
+   Las contraseñas las asigna la organizadora desde Admin. Se guardan en la
+   nube (scope "auth") como hash PBKDF2-SHA256 con sal aleatoria por usuario;
+   nunca se guarda la contraseña en texto. Nota: al ser un archivo estático con
+   clave pública de Supabase, esto evita la suplantación casual entre conocidos,
+   no es seguridad de grado bancario. */
+const SESK = "polla2026v2_sesion_"+POLLA_ID;
+function loadSesion(){ try{return JSON.parse(localStorage.getItem(SESK))||{nombre:null};}catch(e){return {nombre:null};} }
+function saveSesion(){ localStorage.setItem(SESK, JSON.stringify(SESION)); }
+let SESION = loadSesion();
+
+function bytesToHex(b){ return Array.from(b).map(x=>x.toString(16).padStart(2,"0")).join(""); }
+function hexToBytes(h){ const a=new Uint8Array(h.length/2); for(let i=0;i<a.length;i++) a[i]=parseInt(h.substr(i*2,2),16); return a; }
+async function pbkdf2(pass, saltHex){
+  const enc=new TextEncoder();
+  const key=await crypto.subtle.importKey("raw", enc.encode(pass), "PBKDF2", false, ["deriveBits"]);
+  const bits=await crypto.subtle.deriveBits({name:"PBKDF2", salt:hexToBytes(saltHex), iterations:120000, hash:"SHA-256"}, key, 256);
+  return bytesToHex(new Uint8Array(bits));
+}
+function nuevaSal(){ return bytesToHex(crypto.getRandomValues(new Uint8Array(16))); }
+
+function getPartidos(jid){
+  if(DB.partidos?.[jid]?.length) return DB.partidos[jid];
+  return DIAS.find(j=>j.id===jid).partidos;
+}
+function getHoras(jid){ return DB.horas?.[jid] || []; }
+
+/* ====== CIERRE POR PARTIDO (5 min después del pitazo) ======
+   La hora de cada partido la carga la organizadora en Admin (formato HH:MM,
+   en la zona horaria TZ del torneo). Sin hora cargada, el partido NO se cierra
+   por reloj y cae a la regla de día (ver diaCerrado). */
+function kickoffMs(diaFecha, horaHHMM){
+  if(!horaHHMM || !/^\d{1,2}:\d{2}$/.test(horaHHMM)) return null;
+  const hh = horaHHMM.length===4 ? "0"+horaHHMM : horaHHMM;
+  const t = new Date(`${diaFecha}T${hh}:00${TZ}`).getTime();
+  return isNaN(t) ? null : t;
+}
+/* ¿El partido i del día jid está cerrado para editar? */
+function partidoCerrado(jid, i){
+  const j = DIAS.find(d=>d.id===jid); if(!j) return false;
+  const hora = getHoras(jid)[i];
+  const k = kickoffMs(j.fecha, hora);
+  if(k!==null) return Date.now() >= k + GRACIA_MIN*60000;  // 5 min de gracia
+  return diaCerrado(jid);                                  // sin hora: regla de día
+}
+function horaInicioTxt(jid, i){
+  const hora = getHoras(jid)[i];
+  return (hora && /^\d{1,2}:\d{2}$/.test(hora)) ? hora : "";
+}
+
+/* ============ DÍA ACTUAL ============ */
+function hoyStr(){ const d=new Date(); return d.toISOString().slice(0,10); }
+function jornadaActual(){
+  const h=hoyStr();
+  for(const j of DIAS){ if(h<=j.fecha) return j.id; }
+  return DIAS[DIAS.length-1].id;
+}
+/* Un día queda CERRADO para predecir si su fecha ya pasó (antes de hoy).
+   Hoy y los días futuros siguen abiertos. El admin NO se ve afectado. */
+function diaCerrado(jid){
+  const j=DIAS.find(d=>d.id===jid); if(!j) return false;
+  return j.fecha < hoyStr();
+}
+
+/* ============ SUPABASE: capa de datos ============
+   Tabla polla_kv(polla_id, scope, clave, valor jsonb)  PK(polla_id,scope,clave)
+   scope: 'pred' | 'res' | 'partidos' | 'meta'
+*/
+async function sbUpsert(scope, clave, valor){
+  if(!sb) return {error:"no-config"};
+  return await sb.from("polla_kv").upsert(
+    {polla_id:POLLA_ID, scope, clave, valor},
+    {onConflict:"polla_id,scope,clave"}
+  );
+}
+async function sbDelete(scope, clave){
+  if(!sb) return;
+  await sb.from("polla_kv").delete().match({polla_id:POLLA_ID, scope, clave});
+}
+async function cargarTodo(avisar){
+  if(!sb){ DB = Object.assign({partidos:{},res:{},preds:{},campeones:{},campeonReal:"",horas:{},auth:{}}, loadLocal().DB||{}); renderAll(); return; }
+  cargando = true; setConn("cargando");
+  const {data, error} = await sb.from("polla_kv").select("scope,clave,valor").eq("polla_id", POLLA_ID);
+  cargando = false;
+  if(error){ setConn("error"); if(avisar) toast("No se pudo leer la nube",true); console.error(error); return; }
+  const nuevo = {partidos:{}, res:{}, preds:{}, campeones:{}, campeonReal:"", horas:{}, auth:{}};
+  for(const row of (data||[])){
+    if(row.scope==="partidos") nuevo.partidos[row.clave]=row.valor;
+    else if(row.scope==="res") nuevo.res[row.clave]=row.valor;
+    else if(row.scope==="hora") nuevo.horas[row.clave]=row.valor;
+    else if(row.scope==="auth") nuevo.auth[row.clave]=row.valor;
+    else if(row.scope==="meta" && row.clave==="campeonReal") nuevo.campeonReal=row.valor||"";
+    else if(row.scope==="pred"){
+      // clave = "nombre|dia"
+      const sep=row.clave.lastIndexOf("|");
+      const nombre=row.clave.slice(0,sep), dia=row.clave.slice(sep+1);
+      nuevo.preds[nombre]=nuevo.preds[nombre]||{};
+      nuevo.preds[nombre][dia]=row.valor?.m||null;
+      if(row.valor?.c && !nuevo.campeones[nombre]) nuevo.campeones[nombre]=row.valor.c;
+    }
+  }
+  DB = nuevo;
+  setConn("ok");
+  renderAll();
+  if(avisar) toast("Ranking actualizado");
+}
+function setConn(estado){
+  const e=document.getElementById("conn-estado");
+  if(!CONFIGURADO){ e.className="estado off"; e.textContent="● sin conectar (solo este equipo)"; return; }
+  if(estado==="ok"){ e.className="estado on"; e.textContent="● conectado a la nube"; }
+  else if(estado==="cargando"){ e.className="estado off"; e.textContent="● sincronizando…"; }
+  else { e.className="estado off"; e.textContent="● error de conexión"; }
+}
+
+/* ============ UI BUILD ============ */
+let jSel=jornadaActual(), aSel=jornadaActual();
+
+function renderJornBtns(containerId, sel, onpick, lockPast){
+  const act=jornadaActual();
+  document.getElementById(containerId).innerHTML = DIAS.map(j=>{
+    const cerrado = lockPast && diaCerrado(j.id);
+    return `
+    <div class="jorn-btn ${j.id===sel?'activa':''} ${j.id===act?'hoy':''}" style="${cerrado?'opacity:.55;':''}" onclick="${onpick}('${j.id}')">
+      <b>${j.et}</b><span style="font-size:.66rem">${nombreFase(j.fase)}</span>
+      ${j.id===act?'<br><span class="badge-hoy">HOY</span>':cerrado?'<br><span style="font-size:.66rem">🔒 cerrado</span>':''}
+    </div>`;}).join("");
+}
+function pickJ(jid){ jSel=jid; renderJugar(); }
+function pickA(jid){ aSel=jid; renderAdminJornada(); }
+
+function horaMas(hhmm, mins){
+  const [h,m]=hhmm.split(":").map(Number);
+  let tot=h*60+m+mins; tot=((tot%1440)+1440)%1440;
+  return String(Math.floor(tot/60)).padStart(2,"0")+":"+String(tot%60).padStart(2,"0");
+}
+function renderPartidosForm(prefix, jid, container){
+  const ps=getPartidos(jid);
+  if(!ps.length){ container.innerHTML=""; return 0; }
+  const horas=getHoras(jid);
+  container.innerHTML = ps.map((p,i)=>{
+    const hora=horas[i]||"";
+    const cerrado = prefix==="j" && partidoCerrado(jid,i);
+    let cierreTxt="";
+    if(prefix==="j"){
+      if(hora){
+        cierreTxt = cerrado ? `🔒 cerrado (inició ${hora})`
+                            : `⏰ inicia ${hora} · editable hasta ${horaMas(hora,GRACIA_MIN)}`;
+      } else if(cerrado){ cierreTxt="🔒 cerrado"; }
+    }
+    const adminHora = prefix==="a"
+      ? `<input type="text" id="a-h${i}" value="${hora}" placeholder="HH:MM" style="width:62px;text-align:center" maxlength="5" title="Hora de inicio (${TZ})">`
+      : "";
+    return `
+    <div class="partido">
+      <div class="nombre">${p[0]} 🆚 ${p[1]}<span class="fecha">${p[2]||""}${cierreTxt?` · ${cierreTxt}`:""}</span></div>
+      <div class="marcador">
+        ${adminHora}
+        <input type="number" min="0" max="20" id="${prefix}-m${i}a" placeholder="-" ${cerrado?"disabled":""}>
+        <span>—</span>
+        <input type="number" min="0" max="20" id="${prefix}-m${i}b" placeholder="-" ${cerrado?"disabled":""}>
+        ${prefix==="a"?`<button class="mini danger" onclick="quitarPartido(${i})">✕</button>`:""}
+      </div>
+    </div>`;}).join("");
+  return ps.length;
+}
+function leerMarcadores(prefix, n){
+  const arr=[];
+  for(let i=0;i<n;i++){
+    const a=val(prefix+"-m"+i+"a"), b=val(prefix+"-m"+i+"b");
+    arr.push(a!==""&&b!==""?[+a,+b]:null);
+  }
+  return arr;
+}
+function val(id){const e=document.getElementById(id); return e?e.value:"";}
+function setv(id,v){const e=document.getElementById(id); if(e)e.value=v;}
+
+/* ============ PESTAÑA PREDECIR ============ */
+function renderJugar(){
+  // Gate de sesión: sin login no se muestran los partidos
+  const logCard=document.getElementById("j-login-card");
+  const zona=document.getElementById("j-zona");
+  if(!SESION.nombre){ if(logCard)logCard.style.display="block"; if(zona)zona.style.display="none"; return; }
+  if(logCard)logCard.style.display="none"; if(zona)zona.style.display="block";
+  const saludo=document.getElementById("j-saludo");
+  if(saludo) saludo.innerHTML=`Sesión iniciada como <b>${SESION.nombre}</b>.`;
+
+  renderJornBtns("j-jornadas", jSel, "pickJ", true);
+  const j=DIAS.find(x=>x.id===jSel);
+  const ps=getPartidos(jSel);
+  const locks=ps.map((_,i)=>partidoCerrado(jSel,i));
+  const todosCerrados = ps.length>0 && locks.every(Boolean);
+  const algunoCerrado = locks.some(Boolean);
+  document.getElementById("j-jorn-info").innerHTML = todosCerrados
+    ? `<b>${j.et} · ${nombreFase(j.fase)}</b>. <span style="color:var(--bad)">🔒 Todos los partidos de este día ya cerraron: no se puede editar.</span>`
+    : `<b>${j.et} · ${nombreFase(j.fase)}</b>. Predice el marcador en 90 min. Cada partido se cierra <b>${GRACIA_MIN} min después de su pitazo</b>.${algunoCerrado?' <span style="color:var(--bad)">Algunos partidos ya cerraron.</span>':''}`;
+  const n=renderPartidosForm("j", jSel, document.getElementById("j-partidos"));
+  document.getElementById("j-sin-partidos").style.display = n? "none":"block";
+
+  const local=loadLocal();
+  const nombre = SESION.nombre;
+
+  // si ya tengo predicción guardada para este día en la nube, la muestro
+  const guardadas = nombre && DB.preds?.[nombre]?.[jSel];
+  if(guardadas){ guardadas.forEach((m,i)=>{ if(m){setv("j-m"+i+"a",m[0]); setv("j-m"+i+"b",m[1]);} }); }
+  else { // borrador local
+    const b=local.borr?.[jSel];
+    if(b) b.forEach((m,i)=>{ if(m){setv("j-m"+i+"a",m[0]); setv("j-m"+i+"b",m[1]);} });
+  }
+
+  // campeón: si ya lo eligió, lo bloqueo
+  const miCamp = nombre && DB.campeones?.[nombre];
+  const sel=document.getElementById("j-campeon");
+  if(miCamp){ sel.value=miCamp; sel.disabled=true;
+    document.getElementById("j-campeon-info").innerHTML=`Tu campeón ya está fijado: <b>${miCamp}</b> (no se puede cambiar).`;
+  } else { sel.disabled=false;
+    if(local.miCampeon) sel.value=local.miCampeon;
+    document.getElementById("j-campeon-info").textContent="Elígelo solo la primera vez. Después queda bloqueado.";
+  }
+  // El botón se desactiva solo si no queda nada editable
+  document.getElementById("j-btn-guardar").disabled = (n===0 || todosCerrados);
+  if(todosCerrados){
+    document.getElementById("j-aviso").innerHTML = guardadas
+      ? "<span class='hint'>🔒 Este día ya cerró. Así quedó tu pronóstico (no editable).</span>"
+      : "<span class='hint'>🔒 Este día ya cerró. No registraste pronóstico a tiempo.</span>";
+  } else {
+    document.getElementById("j-aviso").textContent = "";
+  }
+  renderMis();
+}
+function renderMis(){
+  const nombre=SESION.nombre;
+  const cont=document.getElementById("j-mis");
+  if(!cont) return;
+  if(!nombre){ cont.innerHTML="<span class='hint'>Inicia sesión para ver tus pronósticos.</span>"; return; }
+  const mp=DB.preds?.[nombre];
+  if(!mp || !Object.keys(mp).length){
+    cont.innerHTML="<span class='hint'>Aún no hay pronósticos guardados con el nombre <b>"+nombre+"</b>. (Ojo: usa siempre el mismo nombre, igualito.)</span>";
+    return;
+  }
+  let total=0, filas="";
+  for(const d of DIAS){
+    const pm=mp[d.id]; if(!pm) continue;
+    const ps=getPartidos(d.id);
+    const txt=pm.map((m,i)=> m? `${ps[i]?.[0]||"?"} <b>${m[0]}-${m[1]}</b> ${ps[i]?.[1]||"?"}`:"").filter(Boolean).join("<br>");
+    const r=puntosJornada(pm, DB.res?.[d.id], d.fecha);
+    const tieneRes = DB.res?.[d.id]?.some(x=>x);
+    if(tieneRes) total+=r.pts;
+    filas+=`<tr><td>${d.et}</td><td style="font-size:.78rem">${txt}</td><td>${tieneRes? "<b>"+r.pts+"</b>" : "<span class='hint'>pendiente</span>"}</td></tr>`;
+  }
+  const camp=DB.campeones?.[nombre]||"—";
+  cont.innerHTML=`<p class="hint">🏆 Tu campeón: <b>${camp}</b> · Puntos hasta hoy: <b>${total}</b></p>`+
+    `<table><tr><th>Día</th><th>Tus marcadores</th><th>Pts</th></tr>${filas}</table>`;
+}
+async function guardarPrediccion(){
+  const nombre=SESION.nombre;
+  const aviso=document.getElementById("j-aviso");
+  if(!nombre){ aviso.innerHTML="<span class='warn'>⚠️ Debes iniciar sesión para guardar.</span>"; return; }
+  const ps=getPartidos(jSel);
+  const locks=ps.map((_,i)=>partidoCerrado(jSel,i));
+  if(ps.length && locks.every(Boolean)){ aviso.innerHTML="<span class='warn'>🔒 Todos los partidos de este día ya cerraron, no se puede guardar.</span>"; return; }
+  const prev=(nombre && DB.preds?.[nombre]?.[jSel]) || [];
+  const form=leerMarcadores("j",ps.length);
+  // mezcla: los partidos ya cerrados conservan lo guardado; los abiertos toman el formulario
+  const m=ps.map((_,i)=> locks[i] ? (prev[i]||null) : form[i]);
+  const errs=[];
+  if(!nombre) errs.push("Falta tu nombre.");
+  if(!ps.length) errs.push("Esta jornada no tiene partidos cargados.");
+  ps.forEach((p,i)=>{ if(!locks[i] && !m[i]) errs.push("Falta marcador: "+p[0]+" vs "+p[1]); });
+  const yaTeniaCamp = nombre && DB.campeones?.[nombre];
+  const campElegido = yaTeniaCamp || val("j-campeon");
+  if(!campElegido) errs.push("Elige tu campeón del mundo.");
+  if(errs.length){
+    aviso.innerHTML="<span class='warn'>⚠️ "+errs.slice(0,5).join("<br>⚠️ ")+(errs.length>5?"<br>…y "+(errs.length-5)+" más":"")+"</span>";
+    return;
+  }
+  // guardar borrador local siempre
+  const local=loadLocal(); local.borr=local.borr||{}; local.borr[jSel]=m;
+  local.miNombre=nombre; local.miCampeon=campElegido; saveLocal(local);
+
+  const btn=document.getElementById("j-btn-guardar"); btn.disabled=true;
+  aviso.innerHTML="<span class='hint'>Guardando…</span>";
+  const {error} = await sbUpsert("pred", nombre+"|"+jSel, {m, c:campElegido});
+  btn.disabled=false;
+  if(error){
+    aviso.innerHTML="<span class='warn'>⚠️ No se pudo guardar en la nube. Revisa tu internet. (Tu borrador quedó en este equipo.)</span>";
+    return;
+  }
+  // refrescar estado local de la nube
+  DB.preds[nombre]=DB.preds[nombre]||{}; DB.preds[nombre][jSel]=m;
+  if(!DB.campeones[nombre]) DB.campeones[nombre]=campElegido;
+  aviso.innerHTML="<span class='ok'>✅ ¡Predicción guardada en la nube para "+j_etiqueta(jSel)+"!</span>";
+  toast("Predicción guardada");
+  renderJugar(); renderParticipantes(); renderResultados();
+}
+function j_etiqueta(jid){ return DIAS.find(d=>d.id===jid)?.et || jid; }
+
+/* ============ LOGIN / LOGOUT DE PARTICIPANTE ============ */
+async function loginParticipante(){
+  const n=(val("j-login-nombre")||"").trim();
+  const pass=(val("j-login-pass")||"").trim();
+  const msg=document.getElementById("j-login-msg");
+  msg.innerHTML="";
+  if(!n||!pass){ msg.textContent="Escribe tu nombre y tu contraseña."; return; }
+  if(!sb){ msg.textContent="No hay conexión con la nube en este momento."; return; }
+  let a=DB.auth?.[n];
+  if(!a){ await cargarTodo(false); a=DB.auth?.[n]; }   // por si aún no había cargado
+  if(!a){ msg.innerHTML="No hay contraseña asignada a <b>"+n+"</b>. Pídesela a la organizadora. (Ojo: escribe tu nombre igualito a como aparece en la polla.)"; return; }
+  const h=await pbkdf2(pass, a.s);
+  if(h!==a.h){ msg.textContent="Contraseña incorrecta."; return; }
+  SESION={nombre:n}; saveSesion();
+  setv("j-login-pass","");
+  renderJugar(); renderResultados();
+  toast("¡Hola, "+n+"!");
+}
+function logoutParticipante(){
+  SESION={nombre:null}; saveSesion();
+  renderJugar(); renderResultados();
+  toast("Sesión cerrada");
+}
+
+/* ============ PESTAÑA ADMIN ============ */
+let adminOK=false;
+function entrarAdmin(){
+  if(val("a-pin")===ADMIN_PIN){
+    adminOK=true;
+    document.getElementById("admin-login").style.display="none";
+    document.getElementById("admin-zona").style.display="block";
+    renderAdminJornada(); renderParticipantes(); renderUsuarios();
+    fillSelect("a-campeon"); if(DB.campeonReal) setv("a-campeon",DB.campeonReal);
+    toast("Modo admin activado");
+  } else { toast("PIN incorrecto",true); }
+}
+function renderAdminJornada(){
+  if(!adminOK) return;
+  renderJornBtns("a-jornadas", aSel, "pickA");
+  const j=DIAS.find(x=>x.id===aSel);
+  document.getElementById("a-jorn-info").innerHTML=`<b>${j.et} · ${nombreFase(j.fase)}</b>. Ingresa aquí los <b>resultados reales</b>.`;
+  renderPartidosForm("a", aSel, document.getElementById("a-partidos"));
+  const r=DB.res?.[aSel];
+  if(r) r.forEach((m,i)=>{ if(m){setv("a-m"+i+"a",m[0]); setv("a-m"+i+"b",m[1]);} });
+}
+async function agregarPartido(){
+  const e1=val("a-eq1"), e2=val("a-eq2");
+  if(!e1||!e2||e1===e2){ toast("Elige dos equipos distintos",true); return; }
+  const ps=[...getPartidos(aSel), [e1,e2,val("a-det")||nombreFase(faseDe(aSel))]];
+  DB.partidos[aSel]=ps;
+  const {error}=await sbUpsert("partidos", aSel, ps);
+  if(error){ toast("No se pudo guardar el partido",true); return; }
+  setv("a-det",""); renderAdminJornada(); toast("Partido agregado y publicado");
+}
+async function quitarPartido(i){
+  const ps=getPartidos(aSel).slice(); ps.splice(i,1);
+  DB.partidos[aSel]=ps;
+  if(DB.res?.[aSel]){ DB.res[aSel].splice(i,1); await sbUpsert("res", aSel, DB.res[aSel]); }
+  if(DB.horas?.[aSel]){ DB.horas[aSel].splice(i,1); await sbUpsert("hora", aSel, DB.horas[aSel]); }
+  await sbUpsert("partidos", aSel, ps);
+  renderAdminJornada();
+}
+async function guardarResultados(){
+  const ps=getPartidos(aSel);
+  const m=leerMarcadores("a",ps.length);
+  DB.res[aSel]=m;
+  const {error}=await sbUpsert("res", aSel, m);
+  if(error){ toast("No se pudo guardar",true); return; }
+  toast("Resultados de "+j_etiqueta(aSel)+" guardados"); renderRanking();
+}
+async function guardarHorarios(){
+  const ps=getPartidos(aSel);
+  if(!ps.length){ toast("No hay partidos en este día",true); return; }
+  const horas=[]; let malo="";
+  for(let i=0;i<ps.length;i++){
+    let h=(val("a-h"+i)||"").trim();
+    if(h && !/^\d{1,2}:\d{2}$/.test(h)) malo=h;
+    if(h && h.length===4) h="0"+h;       // 9:05 -> 09:05
+    horas.push(h||null);
+  }
+  if(malo){ toast("Hora inválida: "+malo+" (usa HH:MM)",true); return; }
+  DB.horas[aSel]=horas;
+  const {error}=await sbUpsert("hora", aSel, horas);
+  if(error){ toast("No se pudo guardar los horarios",true); return; }
+  toast("Horarios de "+j_etiqueta(aSel)+" guardados ("+TZ+")"); renderAdminJornada();
+}
+async function guardarCampeon(){
+  DB.campeonReal=val("a-campeon");
+  const {error}=await sbUpsert("meta","campeonReal", DB.campeonReal);
+  if(error){ toast("No se pudo guardar",true); return; }
+  toast(DB.campeonReal? "Campeón real: "+DB.campeonReal : "Campeón borrado"); renderRanking();
+}
+function renderParticipantes(){
+  const ps=DB.preds||{};
+  const names=Object.keys(ps).sort((a,b)=>a.localeCompare(b));
+  const cont=document.getElementById("a-participantes");
+  if(!cont) return;
+  cont.innerHTML = names.length
+    ? names.map(n=>`<span class="pill"><b>${n}</b> (${Object.keys(ps[n]).sort().join(", ")}) — 🏆 ${DB.campeones?.[n]||"?"}${adminOK?` <a href="#" onclick="quitarPart('${encodeURIComponent(n)}');return false;" style="color:var(--bad)">✕</a>`:""}</span>`).join("")
+    : "<span class='hint'>Aún no hay predicciones.</span>";
+}
+async function quitarPart(nEnc){
+  const n=decodeURIComponent(nEnc);
+  if(!confirm("¿Quitar a "+n+" de la polla?")) return;
+  // borrar todas sus predicciones
+  for(const dia of Object.keys(DB.preds[n]||{})) await sbDelete("pred", n+"|"+dia);
+  delete DB.preds[n]; if(DB.campeones) delete DB.campeones[n];
+  renderParticipantes(); renderRanking(); renderUsuarios(); toast("Participante eliminado");
+}
+
+/* ============ GESTIÓN DE USUARIOS Y CONTRASEÑAS (admin) ============ */
+function renderUsuarios(){
+  const cont=document.getElementById("a-usuarios"); if(!cont||!adminOK) return;
+  const set=new Set([...Object.keys(DB.preds||{}), ...Object.keys(DB.auth||{})]);
+  const names=[...set].sort((a,b)=>a.localeCompare(b));
+  if(!names.length){ cont.innerHTML="<p class='hint'>Aún no hay participantes registrados.</p>"; return; }
+  cont.innerHTML=names.map((n,idx)=>{
+    const tiene=!!DB.auth?.[n];
+    const inp="a-pw-"+idx;
+    return `<div class="partido">
+      <div class="nombre">${n} ${tiene?'<span class="estado on">● con clave</span>':'<span class="estado off">● sin clave</span>'}</div>
+      <div class="marcador">
+        <input type="text" id="${inp}" placeholder="${tiene?'nueva clave':'clave'}" style="width:130px;text-align:left">
+        <button class="mini" onclick="adminSetPass('${encodeURIComponent(n)}','${inp}')">${tiene?'Restablecer':'Asignar'}</button>
+        ${tiene?`<button class="mini danger" title="Quitar contraseña" onclick="adminQuitarPass('${encodeURIComponent(n)}')">✕</button>`:""}
+      </div></div>`;
+  }).join("");
+}
+async function adminSetPass(nEnc, inputId){
+  const n=decodeURIComponent(nEnc);
+  const pass=(val(inputId)||"").trim();
+  if(pass.length<3){ toast("La clave debe tener al menos 3 caracteres",true); return; }
+  const s=nuevaSal(); const h=await pbkdf2(pass, s);
+  const {error}=await sbUpsert("auth", n, {h,s});
+  if(error){ toast("No se pudo guardar la clave",true); return; }
+  DB.auth=DB.auth||{}; DB.auth[n]={h,s};
+  renderUsuarios(); toast("Clave asignada a "+n);
+}
+async function adminQuitarPass(nEnc){
+  const n=decodeURIComponent(nEnc);
+  if(!confirm("¿Quitar la contraseña de "+n+"? No podrá iniciar sesión hasta que le asignes otra.")) return;
+  await sbDelete("auth", n);
+  if(DB.auth) delete DB.auth[n];
+  renderUsuarios(); toast("Contraseña eliminada");
+}
+async function adminCrearCuenta(){
+  const n=(val("a-nuevo-nombre")||"").trim();
+  const pass=(val("a-nuevo-pass")||"").trim();
+  if(!n){ toast("Escribe un nombre",true); return; }
+  if(pass.length<3){ toast("La clave debe tener al menos 3 caracteres",true); return; }
+  if(DB.auth?.[n]){ toast("Ya existe una cuenta con ese nombre",true); return; }
+  const s=nuevaSal(); const h=await pbkdf2(pass, s);
+  const {error}=await sbUpsert("auth", n, {h,s});
+  if(error){ toast("No se pudo crear la cuenta",true); return; }
+  DB.auth=DB.auth||{}; DB.auth[n]={h,s};
+  setv("a-nuevo-nombre",""); setv("a-nuevo-pass","");
+  renderUsuarios(); toast("Cuenta creada: "+n);
+}
+function exportarTodo(){
+  const blob=new Blob([JSON.stringify({polla:POLLA_ID, ...DB},null,1)],{type:"application/json"});
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob);
+  a.download="polla2026-"+POLLA_ID+"-respaldo.json"; a.click();
+}
+async function importarV1(inp){
+  const f=inp.files[0]; if(!f) return;
+  const log=document.getElementById("a-v1-log");
+  if(!sb){ log.innerHTML="<span class='warn'>Primero conecta Supabase (faltan las claves).</span>"; inp.value=""; return; }
+  log.textContent="Leyendo archivo…";
+  let data;
+  try{ data=JSON.parse(await f.text()); }catch(e){ log.innerHTML="<span class='warn'>⚠️ Archivo inválido (no es un JSON).</span>"; inp.value=""; return; }
+  let ok=0, errs=0;
+  const preds=data.preds||{}, campeones=data.campeones||{};
+  for(const nombre of Object.keys(preds)){
+    const camp=campeones[nombre]||"";
+    for(const dia of Object.keys(preds[nombre])){
+      const m=preds[nombre][dia];
+      const {error}=await sbUpsert("pred", nombre+"|"+dia, {m, c:camp});
+      if(error) errs++; else ok++;
+    }
+  }
+  for(const dia of Object.keys(data.res||{})){
+    const {error}=await sbUpsert("res", dia, data.res[dia]); if(error)errs++; else ok++;
+  }
+  for(const dia of Object.keys(data.partidos||{})){
+    const {error}=await sbUpsert("partidos", dia, data.partidos[dia]); if(error)errs++; else ok++;
+  }
+  if(data.campeonReal){ const {error}=await sbUpsert("meta","campeonReal",data.campeonReal); if(error)errs++; else ok++; }
+  inp.value="";
+  log.innerHTML = ok? `<span class='ok'>✅ Importados ${ok} registros de la v1${errs?` (${errs} con error)`:""}.</span>`
+                    : `<span class='warn'>No se encontraron datos para importar en ese archivo.</span>`;
+  await cargarTodo(false);
+  toast("Datos de la v1 importados");
+}
+
+/* ============ PUNTAJE Y RANKING ============
+   Puntaje jerárquico (solo se aplica el de mayor valor que aplique):
+   Fecha 1  (hasta 17-jun):  3 exacto · 1 ganador/empate
+   Fecha 2+ (desde 18-jun):  5 exacto · 3 diferencia de goles · 2 ganador/empate
+   La "diferencia" usa la resta con signo (local−visita): predecir 3-1 y que
+   quede 2-0 son ambos +2 → cuenta. Un empate con marcador distinto (p.ej.
+   1-1 vs 0-0) también es "diferencia correcta" porque la resta es 0 en ambos. */
+function puntosJornada(predM, resM, fecha){
+  const P = ptsDe(fecha);
+  let pts=0, ex=0;
+  (resM||[]).forEach((rm,i)=>{
+    const pm=predM?.[i];
+    if(!rm||!pm) return;
+    if(pm[0]===rm[0] && pm[1]===rm[1]){ pts+=P.exacto; ex++; }
+    else if(P.diferencia!==undefined && (pm[0]-pm[1])===(rm[0]-rm[1])){ pts+=P.diferencia; }
+    else if(Math.sign(pm[0]-pm[1])===Math.sign(rm[0]-rm[1])){ pts+=P.resultado; }
+  });
+  return {pts,ex};
+}
+/* Puntos de UN solo partido (para la pestaña Resultados) */
+function puntosPartido(pm, rm, fecha){
+  if(!pm||!rm) return 0;
+  const P=ptsDe(fecha);
+  if(pm[0]===rm[0] && pm[1]===rm[1]) return P.exacto;
+  if(P.diferencia!==undefined && (pm[0]-pm[1])===(rm[0]-rm[1])) return P.diferencia;
+  if(Math.sign(pm[0]-pm[1])===Math.sign(rm[0]-rm[1])) return P.resultado;
+  return 0;
+}
+/* Ganador(es) de una Fecha (ronda de grupos), a partir de las filas ya calculadas */
+function ganadoresDeFecha(fechaObj, filas, res){
+  const hayRes = fechaObj.dias.some(d=>res[d]?.some(x=>x));
+  if(!hayRes) return null;
+  const maxP = Math.max(...filas.map(p=>p.porFecha[fechaObj.id]||0));
+  if(!(maxP>0)) return {ganadores:[], pts:0};
+  return {ganadores: filas.filter(p=>(p.porFecha[fechaObj.id]||0)===maxP).map(p=>p.n), pts:maxP};
+}
+function renderRanking(){
+  const preds=DB.preds||{}, res=DB.res||{};
+  const tabla=document.getElementById("r-tabla"), porJ=document.getElementById("r-jornadas");
+  const names=Object.keys(preds);
+  if(!names.length){ tabla.innerHTML="<p class='hint'>Aún no hay predicciones. Cuando la gente marque, aparece aquí.</p>"; porJ.innerHTML=""; return; }
+  const filas=names.map(n=>{
+    let tot=0, ex=0; const porFase={}, porFecha={};
+    for(const f of FASES) porFase[f.id]=0;
+    for(const f of FECHAS) porFecha[f.id]=0;
+    for(const d of DIAS){
+      const r=puntosJornada(preds[n][d.id], res[d.id], d.fecha);
+      tot+=r.pts; ex+=r.ex; porFase[d.fase]+=r.pts;
+      const fe=fechaDeDia(d.id); if(fe) porFecha[fe.id]+=r.pts;
+    }
+    let bonus=0;
+    if(DB.campeonReal && DB.campeones?.[n]===DB.campeonReal){ bonus=PTS.campeon; tot+=bonus; }
+    return {n, tot, ex, porFase, porFecha, bonus, camp:DB.campeones?.[n]||"—"};
+  }).sort((a,b)=> b.tot-a.tot || b.ex-a.ex || (b.bonus-a.bonus));
+
+  // Ranking independiente por Fecha / Fase
+  renderPeriodoRanking(filas, res);
+
+  // 🎉 Banner: felicitación al ganador de la Fecha 1
+  const f1 = ganadoresDeFecha(FECHAS[0], filas, res);
+  let bannerHTML="";
+  if(f1 && f1.ganadores.length){
+    const lista = f1.ganadores.join(" y ");
+    const emp = f1.ganadores.length>1;
+    bannerHTML = `<div style="background:linear-gradient(135deg,#f4d35e,#e0a800);color:#0d1321;border-radius:12px;padding:14px 16px;margin-bottom:14px;text-align:center;font-weight:700;">
+      🎉 ¡Felicidades <span style="font-size:1.1rem">${lista}</span>${emp?" (empate)":""}! 🏆<br>
+      <span style="font-weight:600;font-size:.85rem">Ganador${emp?"es":""} de la <b>Fecha 1</b> con ${f1.pts} pts.</span>
+    </div>`;
+  }
+
+  tabla.innerHTML=bannerHTML+"<table><tr><th>#</th><th>Participante</th><th>Total</th><th>Exactos</th><th>Su campeón</th></tr>"+
+    filas.map((f,i)=>`<tr class="${i===0?'pos1':''}"><td>${i===0?"🥇":i===1?"🥈":i===2?"🥉":i+1}</td><td>${f.n}</td><td><b>${f.tot}</b></td><td>${f.ex}</td><td>${f.camp}${f.bonus?" <span class='badge-pts'>+10</span>":""}</td></tr>`).join("")+"</table>";
+
+  // Ganadores por Fecha (rondas de grupos)
+  let fechasHTML="<h2 style='font-size:1rem;color:var(--accent);margin-bottom:4px;'>🗓️ Ganadores por Fecha</h2><table><tr><th>Fecha</th><th>Ganador</th><th>Pts</th></tr>";
+  for(const fe of FECHAS){
+    const g=ganadoresDeFecha(fe, filas, res);
+    if(!g){ fechasHTML+=`<tr><td>${fe.nombre} <span class="hint">(${fe.rango})</span></td><td colspan="2" class="hint">sin resultados aún</td></tr>`; continue; }
+    const txt = g.ganadores.length ? g.ganadores.join(", ")+(g.ganadores.length>1?" (empate)":"") : "—";
+    fechasHTML+=`<tr class="${g.ganadores.length?'pos1':''}"><td><b>${fe.nombre}</b> <span class="hint">(${fe.rango})</span></td><td>${txt}</td><td><b>${g.pts||0}</b></td></tr>`;
+  }
+  fechasHTML+="</table>";
+
+  let pozosHTML="<h2 style='font-size:1rem;color:var(--accent);margin:16px 0 4px;'>💰 Pozos por fase eliminatoria</h2><table><tr><th>Fase (pozo)</th><th>Ganador</th><th>Pts en la fase</th></tr>";
+  for(const f of FASES.filter(x=>x.pozo)){
+    const diasFase=DIAS.filter(d=>d.fase===f.id);
+    const hayRes=diasFase.some(d=>res[d.id]?.some(x=>x));
+    if(!hayRes){ pozosHTML+=`<tr><td>${f.nombre}</td><td colspan="2" class="hint">sin resultados aún</td></tr>`; continue; }
+    const maxP=Math.max(...filas.map(p=>p.porFase[f.id]));
+    const gan=filas.filter(p=>p.porFase[f.id]===maxP && maxP>0);
+    const ganTxt = gan.length ? gan.map(g=>g.n).join(", ")+(gan.length>1?" (empate)":"") : "—";
+    pozosHTML+=`<tr class="${gan.length?'pos1':''}"><td><b>${f.nombre}</b></td><td>${ganTxt}</td><td><b>${maxP||0}</b></td></tr>`;
+  }
+  pozosHTML+="</table><p class='hint' style='margin-top:6px;'>💰 El pozo de cada fase eliminatoria lo gana quien más puntos sumó <b>dentro de esa fase</b>. Si hay empate, se reparte.</p>";
+
+  let detHTML="<details style='margin-top:14px;'><summary>Ver puntos por fase de cada participante</summary><table style='margin-top:8px;'><tr><th>Participante</th>"+
+    FASES.map(f=>`<th>${f.id}</th>`).join("")+"<th>Total</th></tr>"+
+    filas.map(f=>`<tr><td>${f.n}</td>${FASES.map(fa=>`<td>${f.porFase[fa.id]}</td>`).join("")}<td><b>${f.tot-f.bonus}</b></td></tr>`).join("")+
+    "</table></details>";
+
+  porJ.innerHTML=fechasHTML+pozosHTML+detHTML;
+}
+
+/* ============ PESTAÑA RESULTADOS DE PARTICIPANTES ============
+   Solo se muestran los pronósticos de los demás en partidos YA CERRADOS
+   (5 min después del pitazo). Mientras el partido sigue abierto, se ocultan. */
+let resSel = jornadaActual();
+function pickR(jid){ resSel=jid; renderResultados(); }
+function renderResultados(){
+  const aviso=document.getElementById("res-login-aviso");
+  const zona=document.getElementById("res-zona");
+  if(!aviso||!zona) return;
+  if(!SESION.nombre){ aviso.style.display="block"; zona.style.display="none"; return; }
+  aviso.style.display="none"; zona.style.display="block";
+
+  renderJornBtns("res-jornadas", resSel, "pickR");
+  const j=DIAS.find(x=>x.id===resSel);
+  const ps=getPartidos(resSel);
+  document.getElementById("res-info").innerHTML=`<b>${j.et} · ${nombreFase(j.fase)}</b>`;
+  const det=document.getElementById("res-detalle");
+  if(!ps.length){ det.innerHTML="<p class='hint'>Este día aún no tiene partidos cargados.</p>"; return; }
+
+  const preds=DB.preds||{}, res=DB.res||{};
+  const names=Object.keys(preds).sort((a,b)=>a.localeCompare(b));
+  let html="";
+  ps.forEach((p,i)=>{
+    const cerrado=partidoCerrado(resSel,i);
+    const rm=res[resSel]?.[i];
+    html+=`<div class="card" style="margin:10px 0;background:var(--card2)">
+      <h2 style="font-size:.95rem;color:var(--text)">${p[0]} 🆚 ${p[1]}<span class="fecha">${p[2]||""}</span></h2>`;
+    if(!cerrado){
+      const ht=horaInicioTxt(resSel,i);
+      html+=`<p class="hint">🔒 Partido abierto${ht?` (inicia ${ht})`:""}. Los pronósticos se mostrarán cuando cierre.</p></div>`;
+      return;
+    }
+    html+=`<p class="hint">Resultado real: <b>${rm?`${rm[0]} - ${rm[1]}`:"pendiente de cargar"}</b></p>`;
+    let filas="";
+    names.forEach(n=>{
+      const pm=preds[n]?.[resSel]?.[i];
+      if(!pm) return;
+      const pts = rm ? puntosPartido(pm, rm, j.fecha) : null;
+      const mio = n===SESION.nombre;
+      filas+=`<tr class="${mio?'pos1':''}"><td>${n}${mio?" (tú)":""}</td><td><b>${pm[0]} - ${pm[1]}</b></td><td>${pts!==null?pts:"<span class='hint'>—</span>"}</td></tr>`;
+    });
+    html+=`<table><tr><th>Participante</th><th>Pronóstico</th><th>Pts</th></tr>${filas||"<tr><td colspan='3' class='hint'>Nadie pronosticó este partido.</td></tr>"}</table></div>`;
+  });
+  det.innerHTML=html;
+}
+
+/* ============ RANKING POR FECHA / FASE (independiente, desde 0) ============ */
+let rankPeriodo=null;
+function pickPeriodo(pid){ rankPeriodo=pid; renderRanking(); }
+function renderPeriodoRanking(filas, res){
+  const cont=document.getElementById("r-periodos"); if(!cont) return;
+  const periodos=[
+    ...FECHAS.map(f=>({id:f.id, et:f.nombre, sub:f.rango, tipo:"fecha"})),
+    ...FASES.filter(f=>f.pozo).map(f=>({id:f.id, et:f.nombre, sub:"eliminatoria", tipo:"fase"}))
+  ];
+  if(!periodos.some(p=>p.id===rankPeriodo)) rankPeriodo=periodos[0].id;
+  cont.innerHTML=periodos.map(p=>`<div class="jorn-btn ${p.id===rankPeriodo?'activa':''}" onclick="pickPeriodo('${p.id}')"><b>${p.et}</b><span style="font-size:.66rem">${p.sub}</span></div>`).join("");
+
+  const per=periodos.find(p=>p.id===rankPeriodo);
+  const getPts = per.tipo==="fecha" ? (f=>f.porFecha[per.id]||0) : (f=>f.porFase[per.id]||0);
+  const dias = per.tipo==="fecha" ? FECHAS.find(x=>x.id===per.id).dias
+                                  : DIAS.filter(d=>d.fase===per.id).map(d=>d.id);
+  const hayRes = dias.some(d=>res[d]?.some(x=>x));
+  const tcont=document.getElementById("r-periodo-tabla");
+  if(!hayRes){ tcont.innerHTML=`<p class="hint">Aún no hay resultados cargados para <b>${per.et}</b>.</p>`; return; }
+  const orden=filas.map(f=>({n:f.n, p:getPts(f)})).sort((a,b)=>b.p-a.p);
+  tcont.innerHTML=`<table><tr><th>#</th><th>Participante</th><th>Pts en ${per.et}</th></tr>`+
+    orden.map((o,i)=>`<tr class="${i===0&&o.p>0?'pos1':''}"><td>${i===0?"🥇":i===1?"🥈":i===2?"🥉":i+1}</td><td>${o.n}</td><td><b>${o.p}</b></td></tr>`).join("")+
+    `</table>`;
+}
+
+/* ============ PESTAÑA EVOLUCIÓN (líneas de puntos por fecha) ============
+   Dibuja, con SVG puro, los puntos ACUMULADOS de cada participante día por día.
+   Cada línea termina en un círculo (slot) donde luego se pega la carita. */
+function evoColor(i, total){
+  // colores bien diferenciados repartidos por el círculo cromático
+  const hue = Math.round((i * 360 / Math.max(total,1) + 12) % 360);
+  const sat = 70 + (i % 2) * 12;
+  const lig = 58 + (i % 3) * 6;
+  return `hsl(${hue} ${sat}% ${lig}%)`;
+}
+function evoDiaCorto(fecha){
+  // "2026-06-11" -> "11/6"
+  if(!fecha) return "";
+  const [_,m,d] = fecha.split("-");
+  return `${parseInt(d,10)}/${parseInt(m,10)}`;
+}
+function renderEvolucion(){
+  const wrap = document.getElementById("evo-chart-wrap");
+  const leyenda = document.getElementById("evo-leyenda");
+  const nota = document.getElementById("evo-nota");
+  if(!wrap) return;
+  const preds = DB.preds||{}, res = DB.res||{};
+  const names = Object.keys(preds);
+  if(!names.length){
+    wrap.innerHTML="<p class='hint'>Aún no hay predicciones para graficar.</p>";
+    leyenda.innerHTML=""; nota.textContent=""; return;
+  }
+  // Días con al menos un resultado cargado, en orden cronológico
+  const diasConRes = DIAS.filter(d => (res[d.id]||[]).some(x=>x));
+  if(!diasConRes.length){
+    wrap.innerHTML="<p class='hint'>Todavía no hay resultados cargados. Cuando el admin cargue marcadores, la curva aparece aquí.</p>";
+    leyenda.innerHTML=""; nota.textContent=""; return;
+  }
+  const acumular = document.getElementById("evo-acum")?.checked !== false;
+  const verCaritas = document.getElementById("evo-caritas")?.checked !== false;
+
+  // Serie de cada participante: valor en cada día (acumulado o por día)
+  const series = names.map((n,idx)=>{
+    let run = 0;
+    const vals = diasConRes.map(d=>{
+      const r = puntosJornada(preds[n]?.[d.id], res[d.id], d.fecha);
+      run += r.pts;
+      return acumular ? run : r.pts;
+    });
+    return { n, idx, vals, total: vals[vals.length-1], color: evoColor(idx, names.length) };
+  });
+  // ordenar por valor final (para colocar caritas de mayor a menor)
+  const orden = [...series].sort((a,b)=> b.total - a.total);
+
+  // Geometría
+  const N = diasConRes.length;
+  const mL = 44, mT = 26, mB = 54, mR = 150;
+  const stepX = Math.max(60, N>1 ? 78 : 78);
+  const plotW = (N-1) * stepX || stepX;
+  const W = mL + plotW + mR;
+  const plotH = 360;
+  const H = mT + plotH + mB;
+  const yMaxData = Math.max(1, ...series.flatMap(s=>s.vals));
+  // redondear el tope a un múltiplo "bonito"
+  const step = yMaxData<=20?5 : yMaxData<=50?10 : yMaxData<=100?20 : 50;
+  const yMax = Math.ceil(yMaxData/step)*step || step;
+  const X = i => mL + (N>1 ? i*stepX : plotW/2);
+  const Y = v => mT + plotH * (1 - v/yMax);
+
+  // Grid + ejes Y
+  let g = "";
+  for(let v=0; v<=yMax; v+=step){
+    const y = Y(v);
+    g += `<line class="evo-grid" x1="${mL}" y1="${y.toFixed(1)}" x2="${(mL+plotW).toFixed(1)}" y2="${y.toFixed(1)}"/>`;
+    g += `<text class="evo-axis" x="${mL-8}" y="${(y+4).toFixed(1)}" text-anchor="end">${v}</text>`;
+  }
+  // Etiquetas X (días)
+  diasConRes.forEach((d,i)=>{
+    const x = X(i);
+    g += `<line class="evo-grid" x1="${x.toFixed(1)}" y1="${mT}" x2="${x.toFixed(1)}" y2="${(mT+plotH).toFixed(1)}" opacity="0.35"/>`;
+    g += `<text class="evo-axis" x="${x.toFixed(1)}" y="${(mT+plotH+18).toFixed(1)}" text-anchor="middle">${evoDiaCorto(d.fecha)}</text>`;
+    g += `<text class="evo-axis" x="${x.toFixed(1)}" y="${(mT+plotH+34).toFixed(1)}" text-anchor="middle" opacity="0.7" style="font-size:9px">${nombreFase(d.fase)}</text>`;
+  });
+
+  // Líneas + puntos
+  let paths = "";
+  series.forEach(s=>{
+    const pts = s.vals.map((v,i)=>`${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join(" ");
+    paths += `<polyline class="evo-line" points="${pts}" stroke="${s.color}"/>`;
+    s.vals.forEach((v,i)=>{
+      paths += `<circle class="evo-pt" cx="${X(i).toFixed(1)}" cy="${Y(v).toFixed(1)}" r="3.2" fill="${s.color}"><title>${s.n}: ${v} pts (${evoDiaCorto(diasConRes[i].fecha)})</title></circle>`;
+    });
+  });
+
+  // Slots de caritas en columna a la derecha, de-solapados y ordenados por puntaje
+  const slotR = 17, gap = 42;
+  const colX = mL + plotW + 64;
+  // posiciones objetivo según el último valor, luego separar para que no se monten
+  const targets = orden.map(s=> ({ s, y: Y(s.vals[s.vals.length-1]) }));
+  // separar verticalmente (greedy de arriba hacia abajo)
+  for(let i=1;i<targets.length;i++){
+    if(targets[i].y - targets[i-1].y < gap) targets[i].y = targets[i-1].y + gap;
+  }
+  // si se salen por abajo, empujar hacia arriba
+  const bottom = mT + plotH;
+  let overflow = targets.length ? targets[targets.length-1].y - bottom : 0;
+  if(overflow > 0){ targets.forEach(t=> t.y -= overflow); }
+  targets.forEach(t=> { if(t.y < mT) t.y = mT; });
+
+  let slots = "";
+  targets.forEach(t=>{
+    const s = t.s;
+    const lastX = X(s.vals.length-1), lastY = Y(s.vals[s.vals.length-1]);
+    // línea guía desde el final de la curva hasta el slot
+    slots += `<line class="evo-leader" x1="${lastX.toFixed(1)}" y1="${lastY.toFixed(1)}" x2="${(colX-slotR).toFixed(1)}" y2="${t.y.toFixed(1)}" stroke="${s.color}"/>`;
+    if(verCaritas){
+      // slot circular para la carita (la usuaria reemplaza esto luego)
+      slots += `<g class="evo-carita" data-jugador="${s.n.replace(/"/g,'&quot;')}">
+        <circle cx="${colX}" cy="${t.y.toFixed(1)}" r="${slotR}" fill="${s.color}" stroke="var(--bg)" stroke-width="2"/>
+        <text class="evo-slot-init" x="${colX}" y="${t.y.toFixed(1)}">${(s.n.trim()[0]||"?").toUpperCase()}</text>
+      </g>`;
+    } else {
+      slots += `<circle cx="${colX}" cy="${t.y.toFixed(1)}" r="5" fill="${s.color}" stroke="var(--bg)" stroke-width="1.5"/>`;
+    }
+    slots += `<text class="evo-name" x="${(colX+slotR+8).toFixed(1)}" y="${(t.y-2).toFixed(1)}">${s.n}</text>`;
+    slots += `<text class="evo-tot" x="${(colX+slotR+8).toFixed(1)}" y="${(t.y+12).toFixed(1)}">${s.total} pts</text>`;
+  });
+
+  wrap.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Evolución de puntos por fecha">
+    ${g}${paths}${slots}
+  </svg>`;
+
+  // Leyenda
+  leyenda.innerHTML = orden.map(s=>`<span class="chip"><span class="dot" style="background:${s.color}"></span>${s.n} <b style="color:var(--muted);font-weight:600;">(${s.total})</b></span>`).join("");
+  nota.innerHTML = `📅 ${N} día${N>1?'s':''} con resultados · ${acumular?'puntos acumulados':'puntos por día'}. ` +
+    `Los círculos de la derecha son los <b>slots para las caritas</b> (cada &lt;g class="evo-carita"&gt; tiene <code>data-jugador</code> para que sepas de quién es).`;
+}
+
+/* ============ INIT ============ */
+function fillSelect(id){
+  const e=document.getElementById(id); if(!e) return;
+  e.innerHTML=`<option value="">— elegir —</option>`+TODOS.map(t=>`<option>${t}</option>`).join("");
+}
+function renderAll(){
+  document.getElementById("reglas-jornadas").innerHTML="<table><tr><th>Día</th><th>Fase</th><th>Partidos</th></tr>"+
+    DIAS.map(j=>`<tr ${j.id===jornadaActual()?"class='pos1'":""}><td>${j.et}</td><td>${nombreFase(j.fase)}</td><td>${getPartidos(j.id).length||"por definir"}</td></tr>`).join("")+"</table>";
+  const act=DIAS.find(j=>j.id===jornadaActual());
+  document.getElementById("hdr-sub").innerHTML="Día en curso: <b style='color:var(--accent)'>"+act.et+"</b> · "+nombreFase(act.fase);
+  renderJugar(); renderRanking(); renderParticipantes(); renderResultados(); renderEvolucion();
+  if(adminOK){ renderAdminJornada(); renderUsuarios(); }
+}
+document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{
+  document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));
+  document.querySelectorAll(".panel").forEach(x=>x.classList.remove("active"));
+  t.classList.add("active");
+  document.getElementById("p-"+t.dataset.p).classList.add("active");
+  if(t.dataset.p==="ranking") cargarTodo(false);
+  else if(t.dataset.p==="resultados") renderResultados();
+  else if(t.dataset.p==="jugar") renderJugar();
+  else if(t.dataset.p==="evolucion") renderEvolucion();
+});
+// recalcular el gráfico al cambiar las opciones
+["evo-acum","evo-caritas"].forEach(id=>{
+  const el=document.getElementById(id);
+  if(el) el.addEventListener("change", renderEvolucion);
+});
+let toastT;
+function toast(msg,bad){
+  const t=document.getElementById("toast");
+  t.textContent=msg; t.style.background=bad?"var(--bad)":"var(--ok)"; t.style.color=bad?"#fff":"#0d1321";
+  t.style.display="block"; clearTimeout(toastT); toastT=setTimeout(()=>t.style.display="none",3000);
+}
+
+async function initAll(){
+  document.getElementById("polla-id-lbl").textContent = "polla: "+POLLA_ID;
+  document.getElementById("setup-banner").style.display = CONFIGURADO ? "none" : "block";
+  fillSelect("j-campeon"); fillSelect("a-eq1"); fillSelect("a-eq2");
+  // recordar el último nombre escrito en el login (comodidad)
+  const inNom=document.getElementById("j-login-nombre");
+  if(inNom){
+    const l0=loadLocal(); if(l0.miNombre) inNom.value=l0.miNombre;
+    inNom.addEventListener("input", ()=>{ const l=loadLocal(); l.miNombre=inNom.value.trim(); saveLocal(l); });
+    const inPw=document.getElementById("j-login-pass");
+    if(inPw) inPw.addEventListener("keydown", e=>{ if(e.key==="Enter") loginParticipante(); });
+  }
+  setConn(CONFIGURADO?"cargando":"off");
+  renderAll();
+  await cargarTodo(false);
+
+  // Tiempo real: si Supabase está conectado, escuchar cambios y refrescar
+  if(sb){
+    sb.channel("polla_"+POLLA_ID)
+      .on("postgres_changes",
+          {event:"*", schema:"public", table:"polla_kv", filter:"polla_id=eq."+POLLA_ID},
+          ()=>{ if(!cargando) cargarTodo(false); })
+      .subscribe();
+  }
+}
+initAll();
+</script>
+</body>
+</html>
