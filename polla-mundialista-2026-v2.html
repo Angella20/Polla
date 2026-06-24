@@ -64,6 +64,20 @@
   .estado.off{background:rgba(233,79,55,.18); color:var(--bad);}
   .setup-banner{background:rgba(233,79,55,.12); border:1px solid var(--bad); border-radius:10px; padding:12px; margin:14px; font-size:.82rem;}
   .setup-banner b{color:var(--bad);}
+  .evo-toolbar{display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin:6px 0 10px;}
+  .evo-leyenda{display:flex; flex-wrap:wrap; gap:6px 12px; margin:8px 0 4px;}
+  .evo-leyenda .chip{display:inline-flex; align-items:center; gap:6px; font-size:.78rem; color:var(--text);}
+  .evo-leyenda .chip .dot{width:12px; height:12px; border-radius:50%; flex:none;}
+  .evo-chart-wrap{overflow-x:auto; overflow-y:hidden; -webkit-overflow-scrolling:touch; padding-bottom:6px;}
+  .evo-chart-wrap svg{display:block;}
+  .evo-grid{stroke:var(--border); stroke-width:1;}
+  .evo-axis{fill:var(--muted); font-size:11px;}
+  .evo-line{fill:none; stroke-width:2.5; stroke-linejoin:round; stroke-linecap:round;}
+  .evo-pt{stroke:var(--bg); stroke-width:1.5;}
+  .evo-leader{stroke-dasharray:3 3; stroke-width:1.2; opacity:.6;}
+  .evo-name{fill:var(--text); font-size:12px; font-weight:600;}
+  .evo-tot{fill:var(--muted); font-size:11px;}
+  .evo-slot-init{fill:#0d1321; font-size:13px; font-weight:800; text-anchor:middle; dominant-baseline:central;}
 </style>
 </head>
 <body>
@@ -76,6 +90,7 @@
     <div class="tab" data-p="jugar">✏️ Predecir</div>
     <div class="tab" data-p="resultados">👁️ Resultados</div>
     <div class="tab" data-p="ranking">🏆 Ranking</div>
+    <div class="tab" data-p="evolucion">📈 Evolución</div>
     <div class="tab" data-p="admin">🔑 Admin</div>
   </div>
 </header>
@@ -202,6 +217,26 @@
   <div class="card">
     <h2>💰 Pozos por fase</h2>
     <div id="r-jornadas"></div>
+  </div>
+</div>
+
+<!-- ================= EVOLUCIÓN ================= -->
+<div class="panel" id="p-evolucion">
+  <div class="card">
+    <h2>📈 Evolución de puntos por fecha <button class="mini sec" style="float:right" onclick="cargarTodo(true)">🔄 Actualizar</button></h2>
+    <p class="hint">Puntos <b>acumulados</b> de cada participante, día por día. Cada línea termina en un círculo: ahí va su carita. 🙂</p>
+    <div class="evo-toolbar">
+      <label style="display:inline-flex;align-items:center;gap:6px;font-size:.78rem;margin:0;">
+        <input type="checkbox" id="evo-acum" checked style="width:auto;margin:0;"> Acumulado
+      </label>
+      <span class="hint" style="margin:0;">·</span>
+      <label style="display:inline-flex;align-items:center;gap:6px;font-size:.78rem;margin:0;">
+        <input type="checkbox" id="evo-caritas" checked style="width:auto;margin:0;"> Mostrar slots de caritas
+      </label>
+    </div>
+    <div id="evo-leyenda" class="evo-leyenda"></div>
+    <div id="evo-chart-wrap" class="evo-chart-wrap"></div>
+    <p class="hint" id="evo-nota" style="margin-top:8px;"></p>
   </div>
 </div>
 
@@ -1142,6 +1177,139 @@ function renderPeriodoRanking(filas, res){
     `</table>`;
 }
 
+/* ============ PESTAÑA EVOLUCIÓN (líneas de puntos por fecha) ============
+   Dibuja, con SVG puro, los puntos ACUMULADOS de cada participante día por día.
+   Cada línea termina en un círculo (slot) donde luego se pega la carita. */
+function evoColor(i, total){
+  // colores bien diferenciados repartidos por el círculo cromático
+  const hue = Math.round((i * 360 / Math.max(total,1) + 12) % 360);
+  const sat = 70 + (i % 2) * 12;
+  const lig = 58 + (i % 3) * 6;
+  return `hsl(${hue} ${sat}% ${lig}%)`;
+}
+function evoDiaCorto(fecha){
+  // "2026-06-11" -> "11/6"
+  if(!fecha) return "";
+  const [_,m,d] = fecha.split("-");
+  return `${parseInt(d,10)}/${parseInt(m,10)}`;
+}
+function renderEvolucion(){
+  const wrap = document.getElementById("evo-chart-wrap");
+  const leyenda = document.getElementById("evo-leyenda");
+  const nota = document.getElementById("evo-nota");
+  if(!wrap) return;
+  const preds = DB.preds||{}, res = DB.res||{};
+  const names = Object.keys(preds);
+  if(!names.length){
+    wrap.innerHTML="<p class='hint'>Aún no hay predicciones para graficar.</p>";
+    leyenda.innerHTML=""; nota.textContent=""; return;
+  }
+  // Días con al menos un resultado cargado, en orden cronológico
+  const diasConRes = DIAS.filter(d => (res[d.id]||[]).some(x=>x));
+  if(!diasConRes.length){
+    wrap.innerHTML="<p class='hint'>Todavía no hay resultados cargados. Cuando el admin cargue marcadores, la curva aparece aquí.</p>";
+    leyenda.innerHTML=""; nota.textContent=""; return;
+  }
+  const acumular = document.getElementById("evo-acum")?.checked !== false;
+  const verCaritas = document.getElementById("evo-caritas")?.checked !== false;
+
+  // Serie de cada participante: valor en cada día (acumulado o por día)
+  const series = names.map((n,idx)=>{
+    let run = 0;
+    const vals = diasConRes.map(d=>{
+      const r = puntosJornada(preds[n]?.[d.id], res[d.id], d.fecha);
+      run += r.pts;
+      return acumular ? run : r.pts;
+    });
+    return { n, idx, vals, total: vals[vals.length-1], color: evoColor(idx, names.length) };
+  });
+  // ordenar por valor final (para colocar caritas de mayor a menor)
+  const orden = [...series].sort((a,b)=> b.total - a.total);
+
+  // Geometría
+  const N = diasConRes.length;
+  const mL = 44, mT = 26, mB = 54, mR = 150;
+  const stepX = Math.max(60, N>1 ? 78 : 78);
+  const plotW = (N-1) * stepX || stepX;
+  const W = mL + plotW + mR;
+  const plotH = 360;
+  const H = mT + plotH + mB;
+  const yMaxData = Math.max(1, ...series.flatMap(s=>s.vals));
+  // redondear el tope a un múltiplo "bonito"
+  const step = yMaxData<=20?5 : yMaxData<=50?10 : yMaxData<=100?20 : 50;
+  const yMax = Math.ceil(yMaxData/step)*step || step;
+  const X = i => mL + (N>1 ? i*stepX : plotW/2);
+  const Y = v => mT + plotH * (1 - v/yMax);
+
+  // Grid + ejes Y
+  let g = "";
+  for(let v=0; v<=yMax; v+=step){
+    const y = Y(v);
+    g += `<line class="evo-grid" x1="${mL}" y1="${y.toFixed(1)}" x2="${(mL+plotW).toFixed(1)}" y2="${y.toFixed(1)}"/>`;
+    g += `<text class="evo-axis" x="${mL-8}" y="${(y+4).toFixed(1)}" text-anchor="end">${v}</text>`;
+  }
+  // Etiquetas X (días)
+  diasConRes.forEach((d,i)=>{
+    const x = X(i);
+    g += `<line class="evo-grid" x1="${x.toFixed(1)}" y1="${mT}" x2="${x.toFixed(1)}" y2="${(mT+plotH).toFixed(1)}" opacity="0.35"/>`;
+    g += `<text class="evo-axis" x="${x.toFixed(1)}" y="${(mT+plotH+18).toFixed(1)}" text-anchor="middle">${evoDiaCorto(d.fecha)}</text>`;
+    g += `<text class="evo-axis" x="${x.toFixed(1)}" y="${(mT+plotH+34).toFixed(1)}" text-anchor="middle" opacity="0.7" style="font-size:9px">${nombreFase(d.fase)}</text>`;
+  });
+
+  // Líneas + puntos
+  let paths = "";
+  series.forEach(s=>{
+    const pts = s.vals.map((v,i)=>`${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join(" ");
+    paths += `<polyline class="evo-line" points="${pts}" stroke="${s.color}"/>`;
+    s.vals.forEach((v,i)=>{
+      paths += `<circle class="evo-pt" cx="${X(i).toFixed(1)}" cy="${Y(v).toFixed(1)}" r="3.2" fill="${s.color}"><title>${s.n}: ${v} pts (${evoDiaCorto(diasConRes[i].fecha)})</title></circle>`;
+    });
+  });
+
+  // Slots de caritas en columna a la derecha, de-solapados y ordenados por puntaje
+  const slotR = 17, gap = 42;
+  const colX = mL + plotW + 64;
+  // posiciones objetivo según el último valor, luego separar para que no se monten
+  const targets = orden.map(s=> ({ s, y: Y(s.vals[s.vals.length-1]) }));
+  // separar verticalmente (greedy de arriba hacia abajo)
+  for(let i=1;i<targets.length;i++){
+    if(targets[i].y - targets[i-1].y < gap) targets[i].y = targets[i-1].y + gap;
+  }
+  // si se salen por abajo, empujar hacia arriba
+  const bottom = mT + plotH;
+  let overflow = targets.length ? targets[targets.length-1].y - bottom : 0;
+  if(overflow > 0){ targets.forEach(t=> t.y -= overflow); }
+  targets.forEach(t=> { if(t.y < mT) t.y = mT; });
+
+  let slots = "";
+  targets.forEach(t=>{
+    const s = t.s;
+    const lastX = X(s.vals.length-1), lastY = Y(s.vals[s.vals.length-1]);
+    // línea guía desde el final de la curva hasta el slot
+    slots += `<line class="evo-leader" x1="${lastX.toFixed(1)}" y1="${lastY.toFixed(1)}" x2="${(colX-slotR).toFixed(1)}" y2="${t.y.toFixed(1)}" stroke="${s.color}"/>`;
+    if(verCaritas){
+      // slot circular para la carita (la usuaria reemplaza esto luego)
+      slots += `<g class="evo-carita" data-jugador="${s.n.replace(/"/g,'&quot;')}">
+        <circle cx="${colX}" cy="${t.y.toFixed(1)}" r="${slotR}" fill="${s.color}" stroke="var(--bg)" stroke-width="2"/>
+        <text class="evo-slot-init" x="${colX}" y="${t.y.toFixed(1)}">${(s.n.trim()[0]||"?").toUpperCase()}</text>
+      </g>`;
+    } else {
+      slots += `<circle cx="${colX}" cy="${t.y.toFixed(1)}" r="5" fill="${s.color}" stroke="var(--bg)" stroke-width="1.5"/>`;
+    }
+    slots += `<text class="evo-name" x="${(colX+slotR+8).toFixed(1)}" y="${(t.y-2).toFixed(1)}">${s.n}</text>`;
+    slots += `<text class="evo-tot" x="${(colX+slotR+8).toFixed(1)}" y="${(t.y+12).toFixed(1)}">${s.total} pts</text>`;
+  });
+
+  wrap.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Evolución de puntos por fecha">
+    ${g}${paths}${slots}
+  </svg>`;
+
+  // Leyenda
+  leyenda.innerHTML = orden.map(s=>`<span class="chip"><span class="dot" style="background:${s.color}"></span>${s.n} <b style="color:var(--muted);font-weight:600;">(${s.total})</b></span>`).join("");
+  nota.innerHTML = `📅 ${N} día${N>1?'s':''} con resultados · ${acumular?'puntos acumulados':'puntos por día'}. ` +
+    `Los círculos de la derecha son los <b>slots para las caritas</b> (cada &lt;g class="evo-carita"&gt; tiene <code>data-jugador</code> para que sepas de quién es).`;
+}
+
 /* ============ INIT ============ */
 function fillSelect(id){
   const e=document.getElementById(id); if(!e) return;
@@ -1152,7 +1320,7 @@ function renderAll(){
     DIAS.map(j=>`<tr ${j.id===jornadaActual()?"class='pos1'":""}><td>${j.et}</td><td>${nombreFase(j.fase)}</td><td>${getPartidos(j.id).length||"por definir"}</td></tr>`).join("")+"</table>";
   const act=DIAS.find(j=>j.id===jornadaActual());
   document.getElementById("hdr-sub").innerHTML="Día en curso: <b style='color:var(--accent)'>"+act.et+"</b> · "+nombreFase(act.fase);
-  renderJugar(); renderRanking(); renderParticipantes(); renderResultados();
+  renderJugar(); renderRanking(); renderParticipantes(); renderResultados(); renderEvolucion();
   if(adminOK){ renderAdminJornada(); renderUsuarios(); }
 }
 document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{
@@ -1163,6 +1331,12 @@ document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{
   if(t.dataset.p==="ranking") cargarTodo(false);
   else if(t.dataset.p==="resultados") renderResultados();
   else if(t.dataset.p==="jugar") renderJugar();
+  else if(t.dataset.p==="evolucion") renderEvolucion();
+});
+// recalcular el gráfico al cambiar las opciones
+["evo-acum","evo-caritas"].forEach(id=>{
+  const el=document.getElementById(id);
+  if(el) el.addEventListener("change", renderEvolucion);
 });
 let toastT;
 function toast(msg,bad){
