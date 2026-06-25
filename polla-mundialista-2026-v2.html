@@ -85,6 +85,38 @@
   .evo-foto-name{flex:1; font-size:.88rem; min-width:80px;}
   .evo-foto-btn{background:var(--accent2); color:#fff; padding:7px 12px; border-radius:9px; font-size:.78rem; font-weight:600; cursor:pointer; white-space:nowrap;}
   .evo-foto-btn:active{transform:scale(.97);}
+  .h2h-wrap{flex-basis:100%; width:100%; margin-top:6px;}
+  .h2h-btn{margin:0;}
+  .h2h-box{margin-top:8px; background:var(--card2); border:1px solid var(--border); border-radius:8px; padding:8px 10px;}
+  .h2h-box table{margin-top:4px; font-size:.8rem;}
+  .h2h-box th{font-size:.68rem;}
+  .h2h-sum{font-size:.78rem; color:var(--muted);}
+  .h2h-w1{color:var(--ok); font-weight:700;}
+  .h2h-w2{color:var(--accent2); font-weight:700;}
+  .h2h-dr{color:var(--muted);}
+  .bracket-tabs{display:flex; gap:8px; margin:8px 0 12px; flex-wrap:wrap;}
+  .btab{background:var(--card2); border:1px solid var(--border); color:var(--muted); padding:6px 14px; border-radius:16px; cursor:pointer; font-size:.8rem; font-weight:600;}
+  .btab.activa{background:var(--accent); color:#0d1321; border-color:var(--accent);}
+  .bracket-scroll{overflow-x:auto; -webkit-overflow-scrolling:touch; padding-bottom:8px;}
+  .bracket{display:flex; gap:14px; min-width:max-content;}
+  .bk-round{display:flex; flex-direction:column; justify-content:space-around; min-width:172px; gap:10px;}
+  .bk-round-h{font-size:.72rem; text-transform:uppercase; color:var(--accent2); text-align:center; margin-bottom:2px; font-weight:700; letter-spacing:.5px;}
+  .bk-match{background:var(--card2); border:1px solid var(--border); border-radius:9px; padding:6px 8px; font-size:.8rem;}
+  .bk-match .bk-meta{font-size:.62rem; color:var(--muted); margin-bottom:3px;}
+  .bk-team{display:flex; align-items:center; gap:6px; padding:2px 0;}
+  .bk-team .fl{font-size:1rem; flex:none;}
+  .bk-team .nm{flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .bk-team.tbd .nm{color:var(--muted); font-style:italic;}
+  .bk-sep{height:1px; background:var(--border); margin:2px 0;}
+  .bk-final .bk-match{border-color:var(--accent); box-shadow:0 0 0 2px rgba(244,211,94,.25);}
+  .grp-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:12px;}
+  .grp-card{background:var(--card2); border:1px solid var(--border); border-radius:9px; padding:8px 10px;}
+  .grp-card h3{font-size:.82rem; color:var(--accent); margin-bottom:4px;}
+  .grp-card table{font-size:.76rem; margin-top:2px;}
+  .grp-card td,.grp-card th{padding:3px 4px;}
+  .grp-q1{color:var(--ok); font-weight:700;}
+  .grp-q2{color:var(--accent2); font-weight:600;}
+  .grp-q3{color:var(--accent);}
 </style>
 </head>
 <body>
@@ -98,6 +130,7 @@
     <div class="tab" data-p="resultados">👁️ Resultados</div>
     <div class="tab" data-p="ranking">🏆 Ranking</div>
     <div class="tab" data-p="evolucion">📈 Evolución</div>
+    <div class="tab" data-p="cruce">🏆 Cruce</div>
     <div class="tab" data-p="admin">🔑 Admin</div>
   </div>
 </header>
@@ -251,6 +284,21 @@
     <h2>🙂 Fotos de las caritas</h2>
     <p class="hint">Sube una foto para cada participante. Aparecerá dentro de su círculo al final de la línea. Se guarda en la nube, así que todos la ven.</p>
     <div id="evo-fotos"></div>
+  </div>
+</div>
+
+<!-- ================= CRUCE (BRACKET) ================= -->
+<div class="panel" id="p-cruce">
+  <div class="card">
+    <h2>🏆 Cruce de eliminatorias <button class="mini sec" style="float:right" onclick="renderCruce(true)">🔄 Actualizar</button></h2>
+    <p class="hint">Proyección del cuadro según los resultados actuales (posiciones de grupos + 8 mejores terceros). Es una <b>estimación</b>: cambia con cada partido y puede no coincidir con el sorteo oficial de los terceros.</p>
+    <div class="bracket-tabs">
+      <div class="btab activa" data-bt="bracket" onclick="pickBTab('bracket')">Bracket</div>
+      <div class="btab" data-bt="grupos" onclick="pickBTab('grupos')">Grupos</div>
+    </div>
+    <div id="cruce-bracket" class="cruce-view"></div>
+    <div id="cruce-grupos" class="cruce-view" style="display:none"></div>
+    <p class="hint" id="cruce-nota" style="margin-top:8px;"></p>
   </div>
 </div>
 
@@ -701,6 +749,10 @@ function renderPartidosForm(prefix, jid, container){
         <input type="number" min="0" max="20" id="${prefix}-m${i}b" placeholder="-" ${cerrado?"disabled":""}>
         ${prefix==="a"?`<button class="mini danger" onclick="quitarPartido(${i})">✕</button>`:""}
       </div>
+      ${prefix==="j" ? `<div class="h2h-wrap">
+        <button class="mini sec h2h-btn" onclick="toggleH2H(this,'${jsArg(p[0])}','${jsArg(p[1])}')">📊 Últimos 5 enfrentamientos</button>
+        <div class="h2h-box" style="display:none"></div>
+      </div>` : ""}
     </div>`;}).join("");
   return ps.length;
 }
@@ -1542,6 +1594,192 @@ async function traerResultadosAPI(jid){
   if(log) log.innerHTML=msg;
 }
 
+/* ============ HISTORIAL (head-to-head) ============
+   Fuente: martj42/international_results (todos los partidos de selecciones desde 1872,
+   dominio público). Se baja una sola vez y se cachea. */
+function jsArg(s){ return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function teamAliasSet(app){
+  const s=new Set([normTeam(app)]);
+  (EQ_API[app]||[]).forEach(a=>s.add(normTeam(a)));
+  return s;
+}
+const H2H_URL="https://raw.githubusercontent.com/martj42/international_results/master/results.csv";
+let _h2h=null, _h2hLoading=null;
+async function h2hRows(){
+  if(_h2h) return _h2h;
+  if(_h2hLoading) return _h2hLoading;
+  _h2hLoading=(async()=>{
+    const r=await fetch(H2H_URL,{cache:"force-cache"});
+    if(!r.ok) throw new Error("HTTP "+r.status);
+    const txt=await r.text();
+    const lines=txt.split("\n"); const rows=[];
+    for(let i=1;i<lines.length;i++){
+      const ln=lines[i]; if(!ln) continue;
+      const p=ln.split(",");
+      if(p.length<6) continue;
+      const hs=parseInt(p[3],10), as=parseInt(p[4],10);
+      if(isNaN(hs)||isNaN(as)) continue;
+      rows.push({date:p[0], home:p[1], away:p[2], hs, as, tour:p[5], nh:normTeam(p[1]), na:normTeam(p[2])});
+    }
+    _h2h=rows; return rows;
+  })();
+  return _h2hLoading;
+}
+async function toggleH2H(btn, t1, t2){
+  const box=btn.parentElement.querySelector(".h2h-box");
+  if(box.style.display!=="none"){ box.style.display="none"; btn.textContent="📊 Últimos 5 enfrentamientos"; return; }
+  box.style.display="block"; btn.textContent="📊 Ocultar enfrentamientos";
+  if(box.dataset.loaded) return;
+  box.innerHTML="<span class='hint'>Cargando historial… (la primera vez baja la base, puede tardar unos segundos)</span>";
+  try{
+    const rows=await h2hRows();
+    box.innerHTML=renderH2H(rows, t1, t2);
+    box.dataset.loaded="1";
+  }catch(e){
+    box.innerHTML="<span class='warn'>No se pudo cargar el historial: "+e.message+"</span>";
+  }
+}
+function renderH2H(rows, t1, t2){
+  const A=teamAliasSet(t1), B=teamAliasSet(t2);
+  const ms=rows.filter(r=>(A.has(r.nh)&&B.has(r.na))||(B.has(r.nh)&&A.has(r.na)));
+  ms.sort((a,b)=> a.date<b.date?1:-1);
+  if(!ms.length) return `<span class='hint'>Sin enfrentamientos registrados entre <b>${evoEsc(t1)}</b> y <b>${evoEsc(t2)}</b>.</span>`;
+  const last=ms.slice(0,5);
+  let w1=0,w2=0,dr=0;
+  last.forEach(r=>{
+    const homeIsT1=A.has(r.nh);
+    const a=homeIsT1?r.hs:r.as, b=homeIsT1?r.as:r.hs;
+    if(a>b)w1++; else if(b>a)w2++; else dr++;
+  });
+  const filas=last.map(r=>`<tr><td>${r.date.slice(0,4)}</td><td>${evoEsc(r.home)} <b>${r.hs}–${r.as}</b> ${evoEsc(r.away)}</td><td>${evoEsc((r.tour||"").trim())}</td></tr>`).join("");
+  return `<div class="h2h-sum">Últimos ${last.length}: <span class="h2h-w1">${evoEsc(t1)} ${w1}</span> · <span class="h2h-dr">${dr} E</span> · <span class="h2h-w2">${w2} ${evoEsc(t2)}</span></div>`+
+    `<table><tr><th>Año</th><th>Partido</th><th>Torneo</th></tr>${filas}</table>`;
+}
+
+/* ============ CRUCE (BRACKET) — proyección ============
+   Calcula posiciones de grupos desde openfootball y siembra el cuadro de
+   eliminatorias (1º, 2º y 8 mejores terceros). Las rondas siguientes muestran
+   "Ganador Pxx" porque no se predice quién gana cada llave. */
+const FLAGS = {
+  "México":"🇲🇽","Sudáfrica":"🇿🇦","Corea del Sur":"🇰🇷","Chequia":"🇨🇿","Canadá":"🇨🇦",
+  "Bosnia y Herzegovina":"🇧🇦","Catar":"🇶🇦","Suiza":"🇨🇭","Brasil":"🇧🇷","Marruecos":"🇲🇦",
+  "Haití":"🇭🇹","Escocia":"🏴󠁧󠁢󠁳󠁣󠁴󠁿","Estados Unidos":"🇺🇸","Paraguay":"🇵🇾","Australia":"🇦🇺",
+  "Turquía":"🇹🇷","Alemania":"🇩🇪","Curazao":"🇨🇼","Costa de Marfil":"🇨🇮","Ecuador":"🇪🇨",
+  "Países Bajos":"🇳🇱","Japón":"🇯🇵","Suecia":"🇸🇪","Túnez":"🇹🇳","Bélgica":"🇧🇪","Egipto":"🇪🇬",
+  "Irán":"🇮🇷","Nueva Zelanda":"🇳🇿","España":"🇪🇸","Cabo Verde":"🇨🇻","Arabia Saudí":"🇸🇦",
+  "Uruguay":"🇺🇾","Francia":"🇫🇷","Senegal":"🇸🇳","Irak":"🇮🇶","Noruega":"🇳🇴","Argentina":"🇦🇷",
+  "Argelia":"🇩🇿","Austria":"🇦🇹","Jordania":"🇯🇴","Portugal":"🇵🇹","RD Congo":"🇨🇩",
+  "Uzbekistán":"🇺🇿","Colombia":"🇨🇴","Inglaterra":"🏴󠁧󠁢󠁥󠁮󠁧󠁿","Croacia":"🇭🇷","Ghana":"🇬🇭","Panamá":"🇵🇦"
+};
+function calcStandings(all){
+  const groups={};
+  all.forEach(m=>{
+    if(!m.group || !/^Group /.test(m.group)) return;
+    const g=m.group.replace("Group ","").trim();
+    const a1=apiTeamToApp(m.team1)||m.team1, a2=apiTeamToApp(m.team2)||m.team2;
+    groups[g]=groups[g]||{};
+    [a1,a2].forEach(t=>{ groups[g][t]=groups[g][t]||{team:t,pj:0,gf:0,gc:0,pts:0,dg:0}; });
+    const ft=m.score?.ft;
+    if(Array.isArray(ft) && ft[0]!=null && ft[1]!=null){
+      const A=groups[g][a1], B=groups[g][a2];
+      A.pj++; B.pj++; A.gf+=ft[0]; A.gc+=ft[1]; B.gf+=ft[1]; B.gc+=ft[0];
+      if(ft[0]>ft[1]) A.pts+=3; else if(ft[1]>ft[0]) B.pts+=3; else { A.pts++; B.pts++; }
+    }
+  });
+  const order={};
+  for(const g in groups){
+    const arr=Object.values(groups[g]);
+    arr.forEach(t=>t.dg=t.gf-t.gc);
+    arr.sort((x,y)=> y.pts-x.pts || y.dg-x.dg || y.gf-x.gf || x.team.localeCompare(y.team));
+    order[g]=arr;
+  }
+  return order;
+}
+function projectBracket(all){
+  const order=calcStandings(all);
+  // mejores terceros
+  const thirds=[];
+  for(const g of "ABCDEFGHIJKL"){ if(order[g] && order[g][2]) thirds.push(Object.assign({grp:g}, order[g][2])); }
+  thirds.sort((x,y)=> y.pts-x.pts || y.dg-x.dg || y.gf-x.gf || x.grp.localeCompare(y.grp));
+  const best8=thirds.slice(0,8);
+  const best8Set=new Set(best8.map(t=>t.team));
+  const usedThird={};
+  function resolve(code){
+    if(/^[12][A-L]$/.test(code)){ const pos=+code[0]-1, g=code[1]; const t=order[g]&&order[g][pos]; return t? {name:t.team, tbd:false} : {name:code, tbd:true}; }
+    if(/^3/.test(code)){
+      const allowed=code.slice(1).split("/");
+      for(const th of best8){ if(usedThird[th.grp]) continue; if(allowed.includes(th.grp)){ usedThird[th.grp]=1; return {name:th.team, tbd:false}; } }
+      return {name:"3º "+code.slice(1), tbd:true};
+    }
+    if(/^W(\d+)$/.test(code)) return {name:"Ganador P"+code.slice(1), tbd:true};
+    if(/^L(\d+)$/.test(code)) return {name:"Perdedor P"+code.slice(1), tbd:true};
+    return {name:code, tbd:true};
+  }
+  return {order, best8Set, resolve};
+}
+let _bTab="bracket";
+function pickBTab(t){
+  _bTab=t;
+  document.querySelectorAll(".btab").forEach(x=>x.classList.toggle("activa", x.dataset.bt===t));
+  document.getElementById("cruce-bracket").style.display = t==="bracket"?"block":"none";
+  document.getElementById("cruce-grupos").style.display = t==="grupos"?"block":"none";
+}
+function bkTeamHTML(slot){
+  const fl = slot.tbd ? "•" : (FLAGS[slot.name]||"🏳️");
+  return `<div class="bk-team ${slot.tbd?'tbd':''}"><span class="fl">${fl}</span><span class="nm">${evoEsc(slot.name)}</span></div>`;
+}
+function bkMatchHTML(m, proj, finalCls){
+  const t1=proj.resolve(m.team1), t2=proj.resolve(m.team2);
+  return `<div class="bk-match">
+    <div class="bk-meta">P${m.num||""} · ${evoDiaCorto(m.date)}</div>
+    ${bkTeamHTML(t1)}<div class="bk-sep"></div>${bkTeamHTML(t2)}
+  </div>`;
+}
+async function renderCruce(force){
+  const cont=document.getElementById("cruce-bracket"), gcont=document.getElementById("cruce-grupos"), nota=document.getElementById("cruce-nota");
+  if(!cont) return;
+  cont.innerHTML="<p class='hint'>Cargando cuadro…</p>";
+  let all;
+  try{ all=await ofMatches(force); }
+  catch(e){ cont.innerHTML="<span class='warn'>No se pudo leer la fuente: "+e.message+"</span>"; return; }
+  const proj=projectBracket(all);
+  const rounds=[
+    {key:"Round of 32", h:"16avos"},
+    {key:"Round of 16", h:"Octavos"},
+    {key:"Quarter-final", h:"Cuartos"},
+    {key:"Semi-final", h:"Semis"},
+    {key:"Final", h:"Final"}
+  ];
+  let cols="";
+  rounds.forEach(rd=>{
+    const ms=all.filter(m=>m.round===rd.key).sort((a,b)=>(a.num||0)-(b.num||0));
+    if(!ms.length) return;
+    cols+=`<div class="bk-round ${rd.key==='Final'?'bk-final':''}"><div class="bk-round-h">${rd.h}</div>`+
+      ms.map(m=>bkMatchHTML(m, proj)).join("")+`</div>`;
+  });
+  // 3er puesto (aparte)
+  const tercero=all.find(m=>m.round==="Match for third place");
+  let terceroHTML = tercero ? `<div style="margin-top:10px;"><span class="bk-round-h" style="text-align:left">3er puesto</span>${bkMatchHTML(tercero, proj)}</div>` : "";
+  cont.innerHTML = `<div class="bracket-scroll"><div class="bracket">${cols}</div></div>${terceroHTML}`;
+
+  // Grupos
+  let gh="<div class='grp-grid'>";
+  for(const g of "ABCDEFGHIJKL"){
+    const arr=proj.order[g]; if(!arr) continue;
+    gh+=`<div class="grp-card"><h3>Grupo ${g}</h3><table><tr><th>#</th><th>Equipo</th><th>PJ</th><th>DG</th><th>Pts</th></tr>`;
+    arr.forEach((t,i)=>{
+      const cls=i===0?'grp-q1':i===1?'grp-q2':i===2?'grp-q3':'';
+      const star=(i===2 && proj.best8Set.has(t.team))?' ✓':'';
+      gh+=`<tr class="${cls}"><td>${i+1}</td><td>${FLAGS[t.team]||''} ${evoEsc(t.team)}${star}</td><td>${t.pj}</td><td>${t.dg>0?'+':''}${t.dg}</td><td><b>${t.pts}</b></td></tr>`;
+    });
+    gh+="</table></div>";
+  }
+  gh+="</div><p class='hint' style='margin-top:8px;'>🟢 1º · 🔵 2º · 🟡 3º · ✓ = entra como mejor tercero (proyección).</p>";
+  gcont.innerHTML=gh;
+  if(nota) nota.innerHTML="ℹ️ Proyección con los resultados disponibles en la fuente (puede llevar algo de retraso). La asignación de los <b>terceros</b> es aproximada, no el cuadro oficial de la FIFA.";
+  pickBTab(_bTab);
+}
+
 /* ============ INIT ============ */
 function fillSelect(id){
   const e=document.getElementById(id); if(!e) return;
@@ -1564,6 +1802,7 @@ document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{
   else if(t.dataset.p==="resultados") renderResultados();
   else if(t.dataset.p==="jugar") renderJugar();
   else if(t.dataset.p==="evolucion") renderEvolucion();
+  else if(t.dataset.p==="cruce") renderCruce();
 });
 // recalcular el gráfico al cambiar las opciones
 ["evo-acum","evo-caritas"].forEach(id=>{
