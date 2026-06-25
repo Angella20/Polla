@@ -94,6 +94,14 @@
   .h2h-w1{color:var(--ok); font-weight:700;}
   .h2h-w2{color:var(--accent2); font-weight:700;}
   .h2h-dr{color:var(--muted);}
+  .h2h-col-h{font-size:.78rem; font-weight:700; color:var(--text); margin:8px 0 2px;}
+  .h2h-cols{display:flex; gap:12px; flex-wrap:wrap; margin-top:6px;}
+  .h2h-col{flex:1; min-width:200px;}
+  .fm-line{margin-left:6px;}
+  .fm{display:inline-flex; align-items:center; justify-content:center; width:16px; height:16px; border-radius:50%; font-size:.62rem; font-weight:800; color:#0d1321; margin-right:2px;}
+  .fm-V{background:var(--ok);}
+  .fm-E{background:var(--muted);}
+  .fm-D{background:var(--bad); color:#fff;}
   .bracket-tabs{display:flex; gap:8px; margin:8px 0 12px; flex-wrap:wrap;}
   .btab{background:var(--card2); border:1px solid var(--border); color:var(--muted); padding:6px 14px; border-radius:16px; cursor:pointer; font-size:.8rem; font-weight:600;}
   .btab.activa{background:var(--accent); color:#0d1321; border-color:var(--accent);}
@@ -1639,21 +1647,43 @@ async function toggleH2H(btn, t1, t2){
     box.innerHTML="<span class='warn'>No se pudo cargar el historial: "+e.message+"</span>";
   }
 }
+/* últimos N partidos de un equipo (contra cualquier rival) */
+function teamForm(rows, aliasSet, n){
+  const ms=rows.filter(r=> aliasSet.has(r.nh)||aliasSet.has(r.na));
+  ms.sort((a,b)=> a.date<b.date?1:-1);
+  return ms.slice(0,n||5).map(r=>{
+    const home=aliasSet.has(r.nh);
+    const gf=home?r.hs:r.as, ga=home?r.as:r.hs;
+    return {year:r.date.slice(0,4), opp:home?r.away:r.home, gf, ga, res: gf>ga?'V': gf<ga?'D':'E'};
+  });
+}
+function formHTML(title, arr){
+  if(!arr.length) return `<div class="h2h-col"><div class="h2h-col-h">${title}</div><span class='hint'>Sin partidos registrados.</span></div>`;
+  const dots=arr.map(m=>`<span class="fm fm-${m.res}" title="${m.year} vs ${evoEsc(m.opp)} ${m.gf}-${m.ga}">${m.res}</span>`).join("");
+  const filas=arr.map(m=>`<tr><td>${m.year}</td><td>${evoEsc(m.opp)}</td><td><b>${m.gf}–${m.ga}</b></td></tr>`).join("");
+  return `<div class="h2h-col"><div class="h2h-col-h">${title} <span class="fm-line">${dots}</span></div>`+
+    `<table><tr><th>Año</th><th>Rival</th><th>Res</th></tr>${filas}</table></div>`;
+}
 function renderH2H(rows, t1, t2){
   const A=teamAliasSet(t1), B=teamAliasSet(t2);
+  // 1) Entre ellos (head-to-head)
   const ms=rows.filter(r=>(A.has(r.nh)&&B.has(r.na))||(B.has(r.nh)&&A.has(r.na)));
   ms.sort((a,b)=> a.date<b.date?1:-1);
-  if(!ms.length) return `<span class='hint'>Sin enfrentamientos registrados entre <b>${evoEsc(t1)}</b> y <b>${evoEsc(t2)}</b>.</span>`;
-  const last=ms.slice(0,5);
-  let w1=0,w2=0,dr=0;
-  last.forEach(r=>{
-    const homeIsT1=A.has(r.nh);
-    const a=homeIsT1?r.hs:r.as, b=homeIsT1?r.as:r.hs;
-    if(a>b)w1++; else if(b>a)w2++; else dr++;
-  });
-  const filas=last.map(r=>`<tr><td>${r.date.slice(0,4)}</td><td>${evoEsc(r.home)} <b>${r.hs}–${r.as}</b> ${evoEsc(r.away)}</td><td>${evoEsc((r.tour||"").trim())}</td></tr>`).join("");
-  return `<div class="h2h-sum">Últimos ${last.length}: <span class="h2h-w1">${evoEsc(t1)} ${w1}</span> · <span class="h2h-dr">${dr} E</span> · <span class="h2h-w2">${w2} ${evoEsc(t2)}</span></div>`+
-    `<table><tr><th>Año</th><th>Partido</th><th>Torneo</th></tr>${filas}</table>`;
+  let h2h="";
+  if(!ms.length){
+    h2h=`<div class="h2h-col-h">⚔️ Entre ellos</div><span class='hint'>Sin enfrentamientos directos registrados.</span>`;
+  } else {
+    const last=ms.slice(0,5); let w1=0,w2=0,dr=0;
+    last.forEach(r=>{ const h=A.has(r.nh); const a=h?r.hs:r.as, b=h?r.as:r.hs; if(a>b)w1++; else if(b>a)w2++; else dr++; });
+    const filas=last.map(r=>`<tr><td>${r.date.slice(0,4)}</td><td>${evoEsc(r.home)} <b>${r.hs}–${r.as}</b> ${evoEsc(r.away)}</td><td>${evoEsc((r.tour||"").trim())}</td></tr>`).join("");
+    h2h=`<div class="h2h-col-h">⚔️ Entre ellos (últimos ${last.length})</div>`+
+      `<div class="h2h-sum"><span class="h2h-w1">${evoEsc(t1)} ${w1}</span> · <span class="h2h-dr">${dr} E</span> · <span class="h2h-w2">${w2} ${evoEsc(t2)}</span></div>`+
+      `<table><tr><th>Año</th><th>Partido</th><th>Torneo</th></tr>${filas}</table>`;
+  }
+  // 2) Forma de cada uno por separado
+  const fa=teamForm(rows, A, 5), fb=teamForm(rows, B, 5);
+  const cols=`<div class="h2h-cols">${formHTML("📋 "+evoEsc(t1), fa)}${formHTML("📋 "+evoEsc(t2), fb)}</div>`;
+  return h2h + cols;
 }
 
 /* ============ CRUCE (BRACKET) — proyección ============
