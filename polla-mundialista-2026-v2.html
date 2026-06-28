@@ -34,6 +34,9 @@
   .partido .nombre{flex:1; min-width:160px; font-size:.86rem;}
   .partido .fecha{font-size:.68rem; color:var(--muted); display:block;}
   .marcador{display:flex; align-items:center; gap:6px;}
+  .clasif{width:100%; margin-top:6px; padding:8px 10px; background:rgba(244,211,94,.10); border:1px dashed var(--accent); border-radius:8px; font-size:.78rem; display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
+  .clasif-q{color:var(--accent); font-weight:600;}
+  .clasif select{background:var(--card); color:var(--text); border:1px solid var(--border); border-radius:6px; padding:4px 6px; font-size:.8rem;}
   .marcador span{color:var(--muted);}
   button{background:var(--accent); color:#0d1321; border:none; padding:11px 20px; border-radius:10px; font-weight:700; font-size:.92rem; cursor:pointer; margin-top:10px;}
   button.sec{background:var(--accent2); color:#fff;} button.danger{background:var(--bad); color:#fff;}
@@ -187,9 +190,10 @@
       <li><span class="badge-pts">3 pts</span> Diferencia de goles correcta (ej. predices 3-1 y queda 2-0: ambos +2). Un empate con otro marcador, p.ej. 1-1 vs 0-0, también cuenta aquí (diferencia 0).</li>
       <li><span class="badge-pts">2 pts</span> Solo aciertas el ganador o el empate (sin acertar la diferencia).</li>
       <li><span class="badge-pts">0 pts</span> No aciertas ni ganador ni empate.</li>
+      <li><span class="badge-pts">+2 pts</span> <b>Solo en eliminatorias:</b> bono por acertar el equipo que <b>clasifica</b>, aunque el partido se defina en alargue o penales. Si predices empate, eliges a quién pasa; si predices un ganador, se toma ese. Se suma a los puntos del marcador.</li>
       <li><span class="badge-pts">10 pts</span> Campeón del mundo (se paga al final).</li>
     </ul>
-    <p class="hint" style="margin-top:8px;">📌 La <b>Fecha 1</b> (11–17 jun) ya cerró con su sistema original (3 pts exacto · 1 pt ganador) y su ganador quedó definido; no se recalcula. En eliminatorias cuenta el resultado en 90' (el empate vale aunque haya penales). Desempate del ranking: más marcadores exactos; luego, quien acertó al campeón.</p>
+    <p class="hint" style="margin-top:8px;">📌 La <b>Fecha 1</b> (11–17 jun) ya cerró con su sistema original (3 pts exacto · 1 pt ganador) y su ganador quedó definido; no se recalcula. En eliminatorias cuenta el resultado en 90' (el empate vale aunque haya penales) y se suma el <b>bono +2</b> por acertar quién clasifica. Desempate del ranking: más marcadores exactos; luego, quien acertó al campeón.</p>
   </div>
   <div class="card">
     <h2>Calendario día por día</h2>
@@ -452,6 +456,7 @@ const CAMBIO_PUNTAJE = "2026-06-18";                       // desde aquí rige 5
 const PTS_VIEJO = {exacto:3, resultado:1, campeon:10};
 const PTS_NUEVO = {exacto:5, diferencia:3, resultado:2, campeon:10};
 const PTS = PTS_NUEVO;                                      // campeon=10 (común a ambos)
+const BONO_CLASIF = 2;                                      // bono en eliminatorias: acertar el equipo que clasifica (90' empatado → alargue/penales)
 function ptsDe(fecha){ return (fecha && fecha >= CAMBIO_PUNTAJE) ? PTS_NUEVO : PTS_VIEJO; }
 
 /* ====== ZONA HORARIA DEL TORNEO ======
@@ -762,6 +767,7 @@ function renderPartidosForm(prefix, jid, container){
   const horas=getHoras(jid);
   container.innerHTML = ps.map((p,i)=>{
     const hora=horas[i]||"";
+    const elim = faseDe(jid)!=="GR";
     const cerrado = prefix==="j" && partidoCerrado(jid,i);
     let cierreTxt="";
     if(prefix==="j"){
@@ -778,11 +784,19 @@ function renderPartidosForm(prefix, jid, container){
       <div class="nombre">${flagImg(p[0])} ${p[0]} 🆚 ${flagImg(p[1])} ${p[1]}<span class="fecha">${p[2]||""}${cierreTxt?` · ${cierreTxt}`:""}</span></div>
       <div class="marcador">
         ${adminHora}
-        <input type="number" min="0" max="20" id="${prefix}-m${i}a" placeholder="-" ${cerrado?"disabled":""}>
+        <input type="number" min="0" max="20" id="${prefix}-m${i}a" placeholder="-" ${cerrado?"disabled":""} oninput="onScore('${prefix}',${i})">
         <span>—</span>
-        <input type="number" min="0" max="20" id="${prefix}-m${i}b" placeholder="-" ${cerrado?"disabled":""}>
+        <input type="number" min="0" max="20" id="${prefix}-m${i}b" placeholder="-" ${cerrado?"disabled":""} oninput="onScore('${prefix}',${i})">
         ${prefix==="a"?`<button class="mini danger" onclick="quitarPartido(${i})">✕</button>`:""}
       </div>
+      ${elim ? `<div class="clasif" id="${prefix}-cwrap${i}" style="display:none">
+        <span class="clasif-q">⚖️ Empate en 90' — ¿quién avanza? (alargue/penales)</span>
+        <select id="${prefix}-q${i}" ${cerrado?"disabled":""}>
+          <option value="">— elige —</option>
+          <option value="0">${p[0]}</option>
+          <option value="1">${p[1]}</option>
+        </select>
+      </div>` : ""}
       ${prefix==="j" ? `<div class="h2h-wrap">
         <button class="mini sec h2h-btn" onclick="toggleH2H(this,'${jsArg(p[0])}','${jsArg(p[1])}')">📊 Últimos 5 enfrentamientos</button>
         <div class="h2h-box" style="display:none"></div>
@@ -790,16 +804,28 @@ function renderPartidosForm(prefix, jid, container){
     </div>`;}).join("");
   return ps.length;
 }
-function leerMarcadores(prefix, n){
+function leerMarcadores(prefix, n, jid){
   const arr=[];
+  const elim = jid!==undefined && esElim(jid);
   for(let i=0;i<n;i++){
     const a=val(prefix+"-m"+i+"a"), b=val(prefix+"-m"+i+"b");
-    arr.push(a!==""&&b!==""?[+a,+b]:null);
+    if(a!==""&&b!==""){
+      const sc=[+a,+b];
+      if(elim && +a===+b){ const q=val(prefix+"-q"+i); if(q==="0"||q==="1") sc.push(+q); }  // empate en KO → guarda el clasificado elegido
+      arr.push(sc);
+    } else arr.push(null);
   }
   return arr;
 }
 function val(id){const e=document.getElementById(id); return e?e.value:"";}
 function setv(id,v){const e=document.getElementById(id); if(e)e.value=v;}
+/* Muestra el selector "¿quién avanza?" solo cuando el marcador del partido i va empatado */
+function onScore(prefix, i){
+  const wrap=document.getElementById(prefix+"-cwrap"+i);
+  if(!wrap) return;
+  const a=val(prefix+"-m"+i+"a"), b=val(prefix+"-m"+i+"b");
+  wrap.style.display = (a!=="" && b!=="" && +a===+b) ? "flex" : "none";
+}
 
 /* ============ PESTAÑA PREDECIR ============ */
 function renderJugar(){
@@ -828,10 +854,10 @@ function renderJugar(){
 
   // si ya tengo predicción guardada para este día en la nube, la muestro
   const guardadas = nombre && DB.preds?.[nombre]?.[jSel];
-  if(guardadas){ guardadas.forEach((m,i)=>{ if(m){setv("j-m"+i+"a",m[0]); setv("j-m"+i+"b",m[1]);} }); }
+  if(guardadas){ guardadas.forEach((m,i)=>{ if(m){setv("j-m"+i+"a",m[0]); setv("j-m"+i+"b",m[1]); if(m[2]===0||m[2]===1)setv("j-q"+i,m[2]); onScore("j",i);} }); }
   else { // borrador local
     const b=local.borr?.[jSel];
-    if(b) b.forEach((m,i)=>{ if(m){setv("j-m"+i+"a",m[0]); setv("j-m"+i+"b",m[1]);} });
+    if(b) b.forEach((m,i)=>{ if(m){setv("j-m"+i+"a",m[0]); setv("j-m"+i+"b",m[1]); if(m[2]===0||m[2]===1)setv("j-q"+i,m[2]); onScore("j",i);} });
   }
 
   // campeón: si ya lo eligió, lo bloqueo
@@ -869,7 +895,7 @@ function renderMis(){
     const pm=mp[d.id]; if(!pm) continue;
     const ps=getPartidos(d.id);
     const txt=pm.map((m,i)=> m? `${ps[i]?.[0]||"?"} <b>${m[0]}-${m[1]}</b> ${ps[i]?.[1]||"?"}`:"").filter(Boolean).join("<br>");
-    const r=puntosJornada(pm, DB.res?.[d.id], d.fecha);
+    const r=puntosJornada(pm, DB.res?.[d.id], d.fecha, d.id);
     const tieneRes = DB.res?.[d.id]?.some(x=>x);
     if(tieneRes) total+=r.pts;
     filas+=`<tr><td>${d.et}</td><td style="font-size:.78rem">${txt}</td><td>${tieneRes? "<b>"+r.pts+"</b>" : "<span class='hint'>pendiente</span>"}</td></tr>`;
@@ -886,13 +912,14 @@ async function guardarPrediccion(){
   const locks=ps.map((_,i)=>partidoCerrado(jSel,i));
   if(ps.length && locks.every(Boolean)){ aviso.innerHTML="<span class='warn'>🔒 Todos los partidos de este día ya cerraron, no se puede guardar.</span>"; return; }
   const prev=(nombre && DB.preds?.[nombre]?.[jSel]) || [];
-  const form=leerMarcadores("j",ps.length);
+  const form=leerMarcadores("j",ps.length,jSel);
   // mezcla: los partidos ya cerrados conservan lo guardado; los abiertos toman el formulario
   const m=ps.map((_,i)=> locks[i] ? (prev[i]||null) : form[i]);
   const errs=[];
   if(!nombre) errs.push("Falta tu nombre.");
   if(!ps.length) errs.push("Esta jornada no tiene partidos cargados.");
   ps.forEach((p,i)=>{ if(!locks[i] && !m[i]) errs.push("Falta marcador: "+p[0]+" vs "+p[1]); });
+  if(esElim(jSel)) ps.forEach((p,i)=>{ if(!locks[i] && m[i] && m[i][0]===m[i][1] && m[i][2]!==0 && m[i][2]!==1) errs.push("Empate "+p[0]+" vs "+p[1]+": elige quién clasifica."); });
   const yaTeniaCamp = nombre && DB.campeones?.[nombre];
   const campElegido = yaTeniaCamp || val("j-campeon");
   if(!campElegido) errs.push("Elige tu campeón del mundo.");
@@ -964,7 +991,7 @@ function renderAdminJornada(){
   document.getElementById("a-jorn-info").innerHTML=`<b>${j.et} · ${nombreFase(j.fase)}</b>. Ingresa aquí los <b>resultados reales</b>.`;
   renderPartidosForm("a", aSel, document.getElementById("a-partidos"));
   const r=DB.res?.[aSel];
-  if(r) r.forEach((m,i)=>{ if(m){setv("a-m"+i+"a",m[0]); setv("a-m"+i+"b",m[1]);} });
+  if(r) r.forEach((m,i)=>{ if(m){setv("a-m"+i+"a",m[0]); setv("a-m"+i+"b",m[1]); if(m[2]===0||m[2]===1)setv("a-q"+i,m[2]); onScore("a",i);} });
 }
 async function agregarPartido(){
   const e1=val("a-eq1"), e2=val("a-eq2");
@@ -985,7 +1012,10 @@ async function quitarPartido(i){
 }
 async function guardarResultados(){
   const ps=getPartidos(aSel);
-  const m=leerMarcadores("a",ps.length);
+  const m=leerMarcadores("a",ps.length,aSel);
+  if(esElim(aSel)){
+    for(let i=0;i<ps.length;i++){ const r=m[i]; if(r && r[0]===r[1] && r[2]!==0 && r[2]!==1){ toast("Empate en "+ps[i][0]+" vs "+ps[i][1]+": marca quién avanzó (alargue/penales).",true); return; } }
+  }
   DB.res[aSel]=m;
   const {error}=await sbUpsert("res", aSel, m);
   if(error){ toast("No se pudo guardar",true); return; }
@@ -1122,8 +1152,19 @@ async function importarV1(inp){
    La "diferencia" usa la resta con signo (local−visita): predecir 3-1 y que
    quede 2-0 son ambos +2 → cuenta. Un empate con marcador distinto (p.ej.
    1-1 vs 0-0) también es "diferencia correcta" porque la resta es 0 en ambos. */
-function puntosJornada(predM, resM, fecha){
+/* ¿El día es de eliminatorias (no fase de grupos)? */
+function esElim(jid){ const f=faseDe(jid); return !!f && f!=="GR"; }
+/* Equipo que avanza según un marcador [a,b,(q)]: 0=local, 1=visita, null si no se sabe.
+   Si está empatado a 90', usa el 3er elemento (clasificado elegido: 0 o 1). */
+function avanzaDe(sc){
+  if(!sc) return null;
+  if(sc[0]>sc[1]) return 0;
+  if(sc[1]>sc[0]) return 1;
+  return (sc[2]===0||sc[2]===1) ? sc[2] : null;
+}
+function puntosJornada(predM, resM, fecha, jid){
   const P = ptsDe(fecha);
+  const elim = jid!==undefined && esElim(jid);
   let pts=0, ex=0;
   (resM||[]).forEach((rm,i)=>{
     const pm=predM?.[i];
@@ -1131,17 +1172,20 @@ function puntosJornada(predM, resM, fecha){
     if(pm[0]===rm[0] && pm[1]===rm[1]){ pts+=P.exacto; ex++; }
     else if(P.diferencia!==undefined && (pm[0]-pm[1])===(rm[0]-rm[1])){ pts+=P.diferencia; }
     else if(Math.sign(pm[0]-pm[1])===Math.sign(rm[0]-rm[1])){ pts+=P.resultado; }
+    if(elim){ const cr=avanzaDe(rm), cp=avanzaDe(pm); if(cr!==null && cp!==null && cr===cp) pts+=BONO_CLASIF; }   // bono +2 por acertar quién clasifica
   });
   return {pts,ex};
 }
 /* Puntos de UN solo partido (para la pestaña Resultados) */
-function puntosPartido(pm, rm, fecha){
+function puntosPartido(pm, rm, fecha, jid){
   if(!pm||!rm) return 0;
   const P=ptsDe(fecha);
-  if(pm[0]===rm[0] && pm[1]===rm[1]) return P.exacto;
-  if(P.diferencia!==undefined && (pm[0]-pm[1])===(rm[0]-rm[1])) return P.diferencia;
-  if(Math.sign(pm[0]-pm[1])===Math.sign(rm[0]-rm[1])) return P.resultado;
-  return 0;
+  let pts=0;
+  if(pm[0]===rm[0] && pm[1]===rm[1]) pts=P.exacto;
+  else if(P.diferencia!==undefined && (pm[0]-pm[1])===(rm[0]-rm[1])) pts=P.diferencia;
+  else if(Math.sign(pm[0]-pm[1])===Math.sign(rm[0]-rm[1])) pts=P.resultado;
+  if(jid!==undefined && esElim(jid)){ const cr=avanzaDe(rm), cp=avanzaDe(pm); if(cr!==null && cp!==null && cr===cp) pts+=BONO_CLASIF; }
+  return pts;
 }
 /* Ganador(es) de una Fecha (ronda de grupos), a partir de las filas ya calculadas */
 function ganadoresDeFecha(fechaObj, filas, res){
@@ -1161,7 +1205,7 @@ function renderRanking(){
     for(const f of FASES) porFase[f.id]=0;
     for(const f of FECHAS) porFecha[f.id]=0;
     for(const d of DIAS){
-      const r=puntosJornada(preds[n][d.id], res[d.id], d.fecha);
+      const r=puntosJornada(preds[n][d.id], res[d.id], d.fecha, d.id);
       tot+=r.pts; ex+=r.ex; porFase[d.fase]+=r.pts;
       const fe=fechaDeDia(d.id); if(fe) porFecha[fe.id]+=r.pts;
     }
@@ -1250,14 +1294,20 @@ function renderResultados(){
       html+=`<p class="hint">🔒 Partido abierto${ht?` (inicia ${ht})`:""}. Los pronósticos se mostrarán cuando cierre.</p></div>`;
       return;
     }
-    html+=`<p class="hint">Resultado real: <b>${rm?`${rm[0]} - ${rm[1]}`:"pendiente de cargar"}</b></p>`;
+    let avTxt="";
+    if(rm && esElim(resSel) && rm[0]===rm[1]){ const av=avanzaDe(rm); if(av!==null) avTxt=` · ✅ avanza <b>${p[av]}</b>`; }
+    html+=`<p class="hint">Resultado real: <b>${rm?`${rm[0]} - ${rm[1]}`:"pendiente de cargar"}</b>${avTxt}</p>`;
     let filas="";
     names.forEach(n=>{
       const pm=preds[n]?.[resSel]?.[i];
       if(!pm) return;
-      const pts = rm ? puntosPartido(pm, rm, j.fecha) : null;
+      const pts = rm ? puntosPartido(pm, rm, j.fecha, resSel) : null;
       const mio = n===SESION.nombre;
-      filas+=`<tr class="${mio?'pos1':''}"><td>${n}${mio?" (tú)":""}</td><td><b>${pm[0]} - ${pm[1]}</b></td><td>${pts!==null?pts:"<span class='hint'>—</span>"}</td></tr>`;
+      let pickTxt="";
+      if(esElim(resSel) && pm[0]===pm[1] && (pm[2]===0||pm[2]===1)) pickTxt=` <span class="hint">→ ${p[pm[2]]}</span>`;
+      let bonoTxt="";
+      if(rm && esElim(resSel)){ const cr=avanzaDe(rm), cp=avanzaDe(pm); if(cr!==null && cp!==null && cr===cp) bonoTxt=" <span class='ok' title='incluye +2 por acertar el clasificado'>✓</span>"; }
+      filas+=`<tr class="${mio?'pos1':''}"><td>${n}${mio?" (tú)":""}</td><td><b>${pm[0]} - ${pm[1]}</b>${pickTxt}</td><td>${pts!==null?pts+bonoTxt:"<span class='hint'>—</span>"}</td></tr>`;
     });
     html+=`<table><tr><th>Participante</th><th>Pronóstico</th><th>Pts</th></tr>${filas||"<tr><td colspan='3' class='hint'>Nadie pronosticó este partido.</td></tr>"}</table></div>`;
   });
@@ -1355,7 +1405,7 @@ function renderEvolucion(){
   const series = names.map((n,idx)=>{
     let run = 0;
     const vals = diasConRes.map(d=>{
-      const r = puntosJornada(preds[n]?.[d.id], res[d.id], d.fecha);
+      const r = puntosJornada(preds[n]?.[d.id], res[d.id], d.fecha, d.id);
       run += r.pts;
       return acumular ? run : r.pts;
     });
