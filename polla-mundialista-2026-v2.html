@@ -213,6 +213,10 @@
     <label>Contraseña</label>
     <input type="password" id="j-login-pass" placeholder="••••" autocomplete="current-password">
     <button onclick="loginParticipante()">Entrar</button>
+    <div id="j-google-wrap" style="display:none; margin-top:12px;">
+      <div class="hint" style="text-align:center; margin:6px 0;">— o —</div>
+      <button class="sec" onclick="loginGoogle()" style="width:100%;">🔓 Continuar con Google</button>
+    </div>
     <p class="warn" id="j-login-msg" style="margin-top:8px;"></p>
   </div>
 
@@ -421,8 +425,10 @@
    ========================================================================== */
 const SUPABASE_URL      = "https://zbpfgfnpmeoalovbxnjb.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpicGZnZm5wbWVvYWxvdmJ4bmpiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE1NzE3NzgsImV4cCI6MjA5NzE0Nzc3OH0.Z3QA6fX6fQz2jLjDbWV8zOO1FQ5NLbrU5oHdDmiS2cE";
-const ADMIN_PIN         = "2026";                       // cámbialo por el tuyo
+const ADMIN_PIN         = "mundial2026*";               // clave de la organizadora (Angie)
 const POLLA_ID_DEFAULT  = "mundial2026";                // id por defecto si el link no trae ?id=
+const GOOGLE_LOGIN      = false;                        // ⬅️ ponlo en true cuando termines la config (ver GUIA-GOOGLE-LOGIN.md)
+const ADMIN_EMAILS      = ["angellabruno02@gmail.com"]; // correos que entran como organizadora automáticamente (login con Google)
 
 /* id de la polla: permite varias pollas con el mismo archivo usando ?id=  */
 const POLLA_ID = (new URLSearchParams(location.search).get("id") || POLLA_ID_DEFAULT)
@@ -967,15 +973,44 @@ async function loginParticipante(){
   toast("¡Hola, "+n+"!");
 }
 function logoutParticipante(){
+  if(SESION.google && sb){ try{ sb.auth.signOut(); }catch(e){} }
   SESION={nombre:null}; saveSesion();
   renderJugar(); renderResultados();
   toast("Sesión cerrada");
+}
+/* ====== LOGIN CON GOOGLE (Supabase Auth) — opcional.
+   Requiere: activar Google en Supabase + publicar la página + GOOGLE_LOGIN=true.
+   Ver GUIA-GOOGLE-LOGIN.md. Con GOOGLE_LOGIN=false nada de esto se ejecuta. ====== */
+async function loginGoogle(){
+  if(!sb){ toast("No hay conexión con la nube.",true); return; }
+  const { error } = await sb.auth.signInWithOAuth({ provider:"google", options:{ redirectTo: location.href.split("#")[0] } });
+  if(error) toast("No se pudo abrir Google: "+error.message, true);
+}
+function nombreDeGoogle(u){
+  const m=u.user_metadata||{};
+  return String(m.full_name || m.name || (u.email||"").split("@")[0] || "Jugador").trim().slice(0,20);
+}
+function esAdminEmail(){ return !!(SESION.google && SESION.email && ADMIN_EMAILS.map(e=>e.toLowerCase()).includes(SESION.email.toLowerCase())); }
+async function revisarSesionGoogle(){
+  if(!GOOGLE_LOGIN || !sb) return;
+  try{
+    const { data } = await sb.auth.getSession();
+    const ses = data && data.session;
+    if(ses && ses.user){
+      const u=ses.user;
+      SESION = { nombre: nombreDeGoogle(u), email:String(u.email||"").toLowerCase(), google:true };
+      saveSesion();
+      if(esAdminEmail()) adminOK=true;
+    } else if(SESION.google){
+      SESION={nombre:null}; saveSesion();   // la sesión de Google se cerró/expiró
+    }
+  }catch(e){ console.error("Google session:", e); }
 }
 
 /* ============ PESTAÑA ADMIN ============ */
 let adminOK=false;
 function entrarAdmin(){
-  if(val("a-pin")===ADMIN_PIN){
+  if(val("a-pin")===ADMIN_PIN || esAdminEmail()){
     adminOK=true;
     document.getElementById("admin-login").style.display="none";
     document.getElementById("admin-zona").style.display="block";
@@ -1956,6 +1991,11 @@ async function initAll(){
     inNom.addEventListener("input", ()=>{ const l=loadLocal(); l.miNombre=inNom.value.trim(); saveLocal(l); });
     const inPw=document.getElementById("j-login-pass");
     if(inPw) inPw.addEventListener("keydown", e=>{ if(e.key==="Enter") loginParticipante(); });
+  }
+  if(GOOGLE_LOGIN && sb){
+    const gw=document.getElementById("j-google-wrap"); if(gw) gw.style.display="block";
+    sb.auth.onAuthStateChange(()=>{ revisarSesionGoogle().then(()=>{ renderJugar(); renderResultados(); }); });
+    await revisarSesionGoogle();
   }
   setConn(CONFIGURADO?"cargando":"off");
   renderAll();
