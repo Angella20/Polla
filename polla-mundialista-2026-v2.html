@@ -1288,7 +1288,7 @@ function renderResultados(){
     const cerrado=partidoCerrado(resSel,i);
     const rm=res[resSel]?.[i];
     html+=`<div class="card" style="margin:10px 0;background:var(--card2)">
-      <h2 style="font-size:.95rem;color:var(--text)">${flagImg(p[0])} ${p[0]} 🆚 ${flagImg(p[1])} ${p[1]}<span class="fecha">${p[2]||""}</span></h2>`;
+      <h2 style="font-size:.95rem;color:var(--text)">${flagImg(p[0])} ${p[0]} 🆚 ${flagImg(p[1])} ${p[1]}${p[2]?` <span style="font-weight:400;color:var(--muted);font-size:.78rem"> · ${p[2]}</span>`:""}</h2>`;
     if(!cerrado){
       const ht=horaInicioTxt(resSel,i);
       html+=`<p class="hint">🔒 Partido abierto${ht?` (inicia ${ht})`:""}. Los pronósticos se mostrarán cuando cierre.</p></div>`;
