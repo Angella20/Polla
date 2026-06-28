@@ -566,12 +566,28 @@ const DIAS = [
     ["RD Congo","Uzbekistán","Grupo K"],
     ["Argelia","Austria","Grupo J"],
     ["Jordania","Argentina","Grupo J"]]},
-  {id:"D28", fase:"R32", fecha:"2026-06-28", et:"Dom 28 jun", partidos:[]},
-  {id:"D29", fase:"R32", fecha:"2026-06-29", et:"Lun 29 jun", partidos:[]},
-  {id:"D30", fase:"R32", fecha:"2026-06-30", et:"Mar 30 jun", partidos:[]},
-  {id:"D01", fase:"R32", fecha:"2026-07-01", et:"Mié 1 jul", partidos:[]},
-  {id:"D02", fase:"R32", fecha:"2026-07-02", et:"Jue 2 jul", partidos:[]},
-  {id:"D03", fase:"R32", fecha:"2026-07-03", et:"Vie 3 jul", partidos:[]},
+  {id:"D28", fase:"R32", fecha:"2026-06-28", et:"Dom 28 jun", horas:["14:00"], partidos:[
+    ["Sudáfrica","Canadá","Los Ángeles"]]},
+  {id:"D29", fase:"R32", fecha:"2026-06-29", et:"Lun 29 jun", horas:["12:00","15:30","20:00"], partidos:[
+    ["Brasil","Japón","Houston"],
+    ["Alemania","Paraguay","Boston"],
+    ["Países Bajos","Marruecos","Monterrey"]]},
+  {id:"D30", fase:"R32", fecha:"2026-06-30", et:"Mar 30 jun", horas:["12:00","16:00","20:00"], partidos:[
+    ["Costa de Marfil","Noruega","Dallas"],
+    ["Francia","Suecia","Nueva York"],
+    ["México","Ecuador","Ciudad de México"]]},
+  {id:"D01", fase:"R32", fecha:"2026-07-01", et:"Mié 1 jul", horas:["11:00","15:00","19:00"], partidos:[
+    ["Inglaterra","RD Congo","Atlanta"],
+    ["Bélgica","Senegal","Seattle"],
+    ["Estados Unidos","Bosnia y Herzegovina","San Francisco"]]},
+  {id:"D02", fase:"R32", fecha:"2026-07-02", et:"Jue 2 jul", horas:["14:00","18:00","22:00"], partidos:[
+    ["España","Austria","Los Ángeles"],
+    ["Portugal","Croacia","Toronto"],
+    ["Suiza","Argelia","Vancouver"]]},
+  {id:"D03", fase:"R32", fecha:"2026-07-03", et:"Vie 3 jul", horas:["13:00","17:00","20:30"], partidos:[
+    ["Australia","Egipto","Dallas"],
+    ["Argentina","Cabo Verde","Miami"],
+    ["Colombia","Ghana","Kansas City"]]},
   {id:"D04", fase:"R16", fecha:"2026-07-04", et:"Sáb 4 jul", partidos:[]},
   {id:"D05", fase:"R16", fecha:"2026-07-05", et:"Dom 5 jul", partidos:[]},
   {id:"D06", fase:"R16", fecha:"2026-07-06", et:"Lun 6 jul", partidos:[]},
@@ -629,7 +645,7 @@ function getPartidos(jid){
   if(DB.partidos?.[jid]?.length) return DB.partidos[jid];
   return DIAS.find(j=>j.id===jid).partidos;
 }
-function getHoras(jid){ return DB.horas?.[jid] || []; }
+function getHoras(jid){ return DB.horas?.[jid] || DIAS.find(j=>j.id===jid)?.horas || []; }
 
 /* ====== CIERRE POR PARTIDO (5 min después del pitazo) ======
    La hora de cada partido la carga la organizadora en Admin (formato HH:MM,
@@ -759,7 +775,7 @@ function renderPartidosForm(prefix, jid, container){
       : "";
     return `
     <div class="partido">
-      <div class="nombre">${p[0]} 🆚 ${p[1]}<span class="fecha">${p[2]||""}${cierreTxt?` · ${cierreTxt}`:""}</span></div>
+      <div class="nombre">${flagImg(p[0])} ${p[0]} 🆚 ${flagImg(p[1])} ${p[1]}<span class="fecha">${p[2]||""}${cierreTxt?` · ${cierreTxt}`:""}</span></div>
       <div class="marcador">
         ${adminHora}
         <input type="number" min="0" max="20" id="${prefix}-m${i}a" placeholder="-" ${cerrado?"disabled":""}>
@@ -1228,7 +1244,7 @@ function renderResultados(){
     const cerrado=partidoCerrado(resSel,i);
     const rm=res[resSel]?.[i];
     html+=`<div class="card" style="margin:10px 0;background:var(--card2)">
-      <h2 style="font-size:.95rem;color:var(--text)">${p[0]} 🆚 ${p[1]}<span class="fecha">${p[2]||""}</span></h2>`;
+      <h2 style="font-size:.95rem;color:var(--text)">${flagImg(p[0])} ${p[0]} 🆚 ${flagImg(p[1])} ${p[1]}<span class="fecha">${p[2]||""}</span></h2>`;
     if(!cerrado){
       const ht=horaInicioTxt(resSel,i);
       html+=`<p class="hint">🔒 Partido abierto${ht?` (inicia ${ht})`:""}. Los pronósticos se mostrarán cuando cierre.</p></div>`;
