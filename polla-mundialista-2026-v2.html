@@ -207,16 +207,12 @@
   <!-- Login del participante -->
   <div class="card" id="j-login-card">
     <h2>🔑 Ingresar</h2>
-    <p class="hint">Escribe tu nombre y tu contraseña para predecir. Si todavía no tienes contraseña, pídesela a la organizadora.</p>
+    <p class="hint">Escribe tu nombre y la <b>clave de la polla</b> (te la pasa la organizadora).</p>
     <label>Tu nombre</label>
     <input type="text" id="j-login-nombre" placeholder="Ej: Angella" maxlength="20" autocomplete="username">
-    <label>Contraseña</label>
+    <label>Clave de la polla</label>
     <input type="password" id="j-login-pass" placeholder="••••" autocomplete="current-password">
     <button onclick="loginParticipante()">Entrar</button>
-    <div id="j-google-wrap" style="display:none; margin-top:12px;">
-      <div class="hint" style="text-align:center; margin:6px 0;">— o —</div>
-      <button class="sec" onclick="loginGoogle()" style="width:100%;">🔓 Continuar con Google</button>
-    </div>
     <p class="warn" id="j-login-msg" style="margin-top:8px;"></p>
   </div>
 
@@ -425,14 +421,26 @@
    ========================================================================== */
 const SUPABASE_URL      = "https://zbpfgfnpmeoalovbxnjb.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpicGZnZm5wbWVvYWxvdmJ4bmpiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE1NzE3NzgsImV4cCI6MjA5NzE0Nzc3OH0.Z3QA6fX6fQz2jLjDbWV8zOO1FQ5NLbrU5oHdDmiS2cE";
-const ADMIN_PIN         = "mundial2026*";               // clave de la organizadora (Angie)
 const POLLA_ID_DEFAULT  = "mundial2026";                // id por defecto si el link no trae ?id=
-const GOOGLE_LOGIN      = false;                        // ⬅️ ponlo en true cuando termines la config (ver GUIA-GOOGLE-LOGIN.md)
-const ADMIN_EMAILS      = ["angellabruno02@gmail.com"]; // correos que entran como organizadora automáticamente (login con Google)
+
+/* ====== POLLAS — una línea por grupo de amigos ======
+   Cada polla tiene su CLAVE COMPARTIDA: todos en ese grupo entran con esa
+   clave + su nombre (no hay que crear usuario por usuario).
+     entrar : la clave que le pasas al grupo para entrar a jugar.
+     admin  : tu clave de organizadora (para cargar resultados). Ponle una
+              distinta y secreta si no quieres que los jugadores entren a Admin. */
+const POLLAS = {
+  "mundial2026": { entrar:"mundial2026*", admin:"mundial2026*" },
+  // 👉 Para otra polla, copia la línea de arriba con un id nuevo y sus claves:
+  // "amigos-finca": { entrar:"finca2026", admin:"claveSoloTuya" },
+};
 
 /* id de la polla: permite varias pollas con el mismo archivo usando ?id=  */
 const POLLA_ID = (new URLSearchParams(location.search).get("id") || POLLA_ID_DEFAULT)
                    .toLowerCase().replace(/[^a-z0-9_-]/g,"").slice(0,40) || POLLA_ID_DEFAULT;
+const POLLA_CFG   = POLLAS[POLLA_ID] || { entrar:"", admin:"" };
+const POLLA_CLAVE = POLLA_CFG.entrar;                    // clave compartida para ENTRAR a esta polla
+const ADMIN_PIN   = POLLA_CFG.admin || POLLA_CFG.entrar; // clave de organizadora de esta polla
 
 const CONFIGURADO = SUPABASE_URL.startsWith("http") && SUPABASE_ANON_KEY.length > 20;
 let sb = null;
@@ -960,57 +968,23 @@ async function loginParticipante(){
   const pass=(val("j-login-pass")||"").trim();
   const msg=document.getElementById("j-login-msg");
   msg.innerHTML="";
-  if(!n||!pass){ msg.textContent="Escribe tu nombre y tu contraseña."; return; }
-  if(!sb){ msg.textContent="No hay conexión con la nube en este momento."; return; }
-  let a=DB.auth?.[n];
-  if(!a){ await cargarTodo(false); a=DB.auth?.[n]; }   // por si aún no había cargado
-  if(!a){ msg.innerHTML="No hay contraseña asignada a <b>"+n+"</b>. Pídesela a la organizadora. (Ojo: escribe tu nombre igualito a como aparece en la polla.)"; return; }
-  const h=await pbkdf2(pass, a.s);
-  if(h!==a.h){ msg.textContent="Contraseña incorrecta."; return; }
+  if(!n){ msg.textContent="Escribe tu nombre."; return; }
+  if(POLLA_CLAVE && pass!==POLLA_CLAVE){ msg.textContent="Clave de la polla incorrecta. Pídesela a la organizadora."; return; }
   SESION={nombre:n}; saveSesion();
   setv("j-login-pass","");
   renderJugar(); renderResultados();
   toast("¡Hola, "+n+"!");
 }
 function logoutParticipante(){
-  if(SESION.google && sb){ try{ sb.auth.signOut(); }catch(e){} }
   SESION={nombre:null}; saveSesion();
   renderJugar(); renderResultados();
   toast("Sesión cerrada");
-}
-/* ====== LOGIN CON GOOGLE (Supabase Auth) — opcional.
-   Requiere: activar Google en Supabase + publicar la página + GOOGLE_LOGIN=true.
-   Ver GUIA-GOOGLE-LOGIN.md. Con GOOGLE_LOGIN=false nada de esto se ejecuta. ====== */
-async function loginGoogle(){
-  if(!sb){ toast("No hay conexión con la nube.",true); return; }
-  const { error } = await sb.auth.signInWithOAuth({ provider:"google", options:{ redirectTo: location.href.split("#")[0] } });
-  if(error) toast("No se pudo abrir Google: "+error.message, true);
-}
-function nombreDeGoogle(u){
-  const m=u.user_metadata||{};
-  return String(m.full_name || m.name || (u.email||"").split("@")[0] || "Jugador").trim().slice(0,20);
-}
-function esAdminEmail(){ return !!(SESION.google && SESION.email && ADMIN_EMAILS.map(e=>e.toLowerCase()).includes(SESION.email.toLowerCase())); }
-async function revisarSesionGoogle(){
-  if(!GOOGLE_LOGIN || !sb) return;
-  try{
-    const { data } = await sb.auth.getSession();
-    const ses = data && data.session;
-    if(ses && ses.user){
-      const u=ses.user;
-      SESION = { nombre: nombreDeGoogle(u), email:String(u.email||"").toLowerCase(), google:true };
-      saveSesion();
-      if(esAdminEmail()) adminOK=true;
-    } else if(SESION.google){
-      SESION={nombre:null}; saveSesion();   // la sesión de Google se cerró/expiró
-    }
-  }catch(e){ console.error("Google session:", e); }
 }
 
 /* ============ PESTAÑA ADMIN ============ */
 let adminOK=false;
 function entrarAdmin(){
-  if(val("a-pin")===ADMIN_PIN || esAdminEmail()){
+  if(val("a-pin")===ADMIN_PIN){
     adminOK=true;
     document.getElementById("admin-login").style.display="none";
     document.getElementById("admin-zona").style.display="block";
@@ -1991,11 +1965,6 @@ async function initAll(){
     inNom.addEventListener("input", ()=>{ const l=loadLocal(); l.miNombre=inNom.value.trim(); saveLocal(l); });
     const inPw=document.getElementById("j-login-pass");
     if(inPw) inPw.addEventListener("keydown", e=>{ if(e.key==="Enter") loginParticipante(); });
-  }
-  if(GOOGLE_LOGIN && sb){
-    const gw=document.getElementById("j-google-wrap"); if(gw) gw.style.display="block";
-    sb.auth.onAuthStateChange(()=>{ revisarSesionGoogle().then(()=>{ renderJugar(); renderResultados(); }); });
-    await revisarSesionGoogle();
   }
   setConn(CONFIGURADO?"cargando":"off");
   renderAll();
