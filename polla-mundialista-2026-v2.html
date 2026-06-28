@@ -402,6 +402,21 @@
       <h2>Respaldo (v2)</h2>
       <button class="sec" onclick="exportarTodo()">⬆️ Exportar respaldo (JSON)</button>
     </div>
+
+    <div class="card">
+      <h2>➕ Crear nueva polla (otro grupo)</h2>
+      <p class="hint">Crea una polla para otro grupo de amigos. Se guarda en la nube y queda lista al instante (no hay que tocar el código). Luego compártele al grupo el enlace y la clave.</p>
+      <div class="flexrow">
+        <div><label>id (sin espacios)</label><input type="text" id="np-id" maxlength="40" placeholder="ej: amigos-finca"></div>
+        <div><label>Nombre visible</label><input type="text" id="np-nombre" maxlength="40" placeholder="ej: Polla de la finca"></div>
+      </div>
+      <div class="flexrow" style="margin-top:8px;">
+        <div><label>Clave para entrar (la del grupo)</label><input type="text" id="np-entrar" maxlength="40" placeholder="ej: finca2026"></div>
+        <div><label>Tu clave de admin (secreta)</label><input type="text" id="np-admin" maxlength="40" placeholder="solo para ti"></div>
+      </div>
+      <button class="sec" style="margin-top:10px;" onclick="crearPolla()">Crear polla</button>
+      <p class="hint" id="np-msg" style="margin-top:8px;"></p>
+    </div>
   </div>
 </div>
 
@@ -631,7 +646,7 @@ function nombreFase(fid){ return FASES.find(f=>f.id===fid)?.nombre||fid; }
      campeonReal: "País"
    }
 ============================================================ */
-let DB = {partidos:{}, res:{}, preds:{}, campeones:{}, campeonReal:"", horas:{}, auth:{}};
+let DB = {partidos:{}, res:{}, preds:{}, campeones:{}, campeonReal:"", horas:{}, auth:{}, pollaCfg:null};
 let cargando = false;
 
 /* localStorage solo para mi borrador / mi nombre local */
@@ -719,17 +734,18 @@ async function sbDelete(scope, clave){
   await sb.from("polla_kv").delete().match({polla_id:POLLA_ID, scope, clave});
 }
 async function cargarTodo(avisar){
-  if(!sb){ DB = Object.assign({partidos:{},res:{},preds:{},campeones:{},campeonReal:"",horas:{},auth:{},caritas:{}}, loadLocal().DB||{}); if(!DB.caritas) DB.caritas={}; renderAll(); return; }
+  if(!sb){ DB = Object.assign({partidos:{},res:{},preds:{},campeones:{},campeonReal:"",horas:{},auth:{},caritas:{},pollaCfg:null}, loadLocal().DB||{}); if(!DB.caritas) DB.caritas={}; renderAll(); return; }
   cargando = true; setConn("cargando");
   const {data, error} = await sb.from("polla_kv").select("scope,clave,valor").eq("polla_id", POLLA_ID);
   cargando = false;
   if(error){ setConn("error"); if(avisar) toast("No se pudo leer la nube",true); console.error(error); return; }
-  const nuevo = {partidos:{}, res:{}, preds:{}, campeones:{}, campeonReal:"", horas:{}, auth:{}, caritas:{}};
+  const nuevo = {partidos:{}, res:{}, preds:{}, campeones:{}, campeonReal:"", horas:{}, auth:{}, caritas:{}, pollaCfg:null};
   for(const row of (data||[])){
     if(row.scope==="partidos") nuevo.partidos[row.clave]=row.valor;
     else if(row.scope==="res") nuevo.res[row.clave]=row.valor;
     else if(row.scope==="hora") nuevo.horas[row.clave]=row.valor;
     else if(row.scope==="auth") nuevo.auth[row.clave]=row.valor;
+    else if(row.scope==="polla" && row.clave==="config") nuevo.pollaCfg=row.valor;   // config de ESTA polla (clave compartida + admin, cifradas)
     else if(row.scope==="carita") nuevo.caritas[row.clave]=row.valor?.img || row.valor || "";
     else if(row.scope==="meta" && row.clave==="campeonReal") nuevo.campeonReal=row.valor||"";
     else if(row.scope==="pred"){
@@ -963,13 +979,28 @@ async function guardarPrediccion(){
 function j_etiqueta(jid){ return DIAS.find(d=>d.id===jid)?.et || jid; }
 
 /* ============ LOGIN / LOGOUT DE PARTICIPANTE ============ */
+/* Verifica la clave compartida de ESTA polla: usa la config de la nube (cifrada)
+   si existe; si no, cae a la clave del archivo (POLLA_CLAVE). */
+async function verificarClavePolla(pass){
+  const c=DB.pollaCfg;
+  if(c){ if(!c.entrar) return true; const h=await pbkdf2(pass, c.entrar.s); return h===c.entrar.h; }
+  if(!POLLA_CLAVE) return true;
+  return pass===POLLA_CLAVE;
+}
+/* Igual, para la clave de organizadora (admin) de esta polla. */
+async function verificarClaveAdmin(pass){
+  const c=DB.pollaCfg;
+  if(c && c.admin){ const h=await pbkdf2(pass, c.admin.s); return h===c.admin.h; }
+  return pass===ADMIN_PIN;
+}
 async function loginParticipante(){
   const n=(val("j-login-nombre")||"").trim();
   const pass=(val("j-login-pass")||"").trim();
   const msg=document.getElementById("j-login-msg");
   msg.innerHTML="";
   if(!n){ msg.textContent="Escribe tu nombre."; return; }
-  if(POLLA_CLAVE && pass!==POLLA_CLAVE){ msg.textContent="Clave de la polla incorrecta. Pídesela a la organizadora."; return; }
+  if(sb && !POLLAS[POLLA_ID] && !DB.pollaCfg){ await cargarTodo(false); }   // carga la config de la polla (nube) si hace falta
+  if(!(await verificarClavePolla(pass))){ msg.textContent="Clave de la polla incorrecta. Pídesela a la organizadora."; return; }
   SESION={nombre:n}; saveSesion();
   setv("j-login-pass","");
   renderJugar(); renderResultados();
@@ -983,8 +1014,9 @@ function logoutParticipante(){
 
 /* ============ PESTAÑA ADMIN ============ */
 let adminOK=false;
-function entrarAdmin(){
-  if(val("a-pin")===ADMIN_PIN){
+async function entrarAdmin(){
+  if(sb && !POLLAS[POLLA_ID] && !DB.pollaCfg){ await cargarTodo(false); }
+  if(await verificarClaveAdmin(val("a-pin"))){
     adminOK=true;
     document.getElementById("admin-login").style.display="none";
     document.getElementById("admin-zona").style.display="block";
@@ -992,6 +1024,30 @@ function entrarAdmin(){
     fillSelect("a-campeon"); if(DB.campeonReal) setv("a-campeon",DB.campeonReal);
     toast("Modo admin activado");
   } else { toast("PIN incorrecto",true); }
+}
+/* ====== CREAR UNA POLLA NUEVA (se guarda en la nube; claves cifradas con PBKDF2) ====== */
+async function crearPolla(){
+  const msg=document.getElementById("np-msg"); if(!msg) return;
+  if(!sb){ msg.textContent="No hay conexión con la nube."; return; }
+  const id=(val("np-id")||"").toLowerCase().replace(/[^a-z0-9_-]/g,"").slice(0,40);
+  const nombre=(val("np-nombre")||"").trim();
+  const entrar=(val("np-entrar")||"").trim();
+  const admin=(val("np-admin")||"").trim();
+  if(!id){ msg.innerHTML="<span class='warn'>Pon un id válido (letras, números o guiones, sin espacios).</span>"; return; }
+  if(admin.length<3){ msg.innerHTML="<span class='warn'>La clave de admin debe tener al menos 3 caracteres.</span>"; return; }
+  if(POLLAS[id]){ msg.innerHTML="<span class='warn'>El id <b>"+id+"</b> ya existe en el archivo. Elige otro.</span>"; return; }
+  msg.innerHTML="<span class='hint'>Creando…</span>";
+  const {data:ex, error:e1}=await sb.from("polla_kv").select("clave").eq("polla_id",id).eq("scope","polla").limit(1);
+  if(e1){ msg.innerHTML="<span class='warn'>No se pudo verificar (revisa tu internet).</span>"; return; }
+  if(ex && ex.length){ msg.innerHTML="<span class='warn'>Ya existe una polla con id <b>"+id+"</b>. Elige otro.</span>"; return; }
+  const cfg={ nombre:nombre||id, creada:new Date().toISOString(), entrar:null, admin:{s:nuevaSal(),h:""} };
+  if(entrar){ const s=nuevaSal(); cfg.entrar={s, h:await pbkdf2(entrar, s)}; }
+  cfg.admin.h=await pbkdf2(admin, cfg.admin.s);
+  const {error:e2}=await sb.from("polla_kv").upsert({polla_id:id, scope:"polla", clave:"config", valor:cfg},{onConflict:"polla_id,scope,clave"});
+  if(e2){ msg.innerHTML="<span class='warn'>No se pudo crear (revisa tu internet).</span>"; return; }
+  const link=location.href.split("#")[0].split("?")[0]+"?id="+id;
+  msg.innerHTML="<span class='ok'>✅ Polla <b>"+id+"</b> creada.</span><br>🔗 Enlace para el grupo:<br><b>"+link+"</b><br>🔑 Clave para entrar: <b>"+(entrar||"(sin clave)")+"</b><br><span class='hint'>Anótalos. La clave de admin no se vuelve a mostrar.</span>";
+  setv("np-id",""); setv("np-nombre",""); setv("np-entrar",""); setv("np-admin","");
 }
 function renderAdminJornada(){
   if(!adminOK) return;
