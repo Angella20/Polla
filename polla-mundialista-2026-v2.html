@@ -80,6 +80,8 @@
   .evo-leader{stroke-dasharray:3 3; stroke-width:1.2; opacity:.6;}
   .evo-name{fill:var(--text); font-size:12px; font-weight:600;}
   .evo-tot{fill:var(--muted); font-size:11px;}
+  .evo-prob{font-size:11.5px; font-weight:800;}
+  .evo-prob.cero{fill:var(--muted); font-weight:600; font-size:10px; font-style:italic;}
   .evo-slot-init{fill:#0d1321; font-size:13px; font-weight:800; text-anchor:middle; dominant-baseline:central;}
   .evo-foto-row{display:flex; align-items:center; gap:10px; padding:8px 4px; border-bottom:1px dashed var(--border);}
   .evo-foto-row:last-child{border-bottom:none;}
@@ -1540,6 +1542,49 @@ function renderEvoPeriodos(){
       <b>${p.et}</b><span style="font-size:.66rem">${p.sub}</span>${hayRes?'':'<br><span style="font-size:.62rem">sin datos</span>'}</div>`;
   }).join("");
 }
+/* ============ PROBABILIDAD DE GANAR LA "FECHA" (periodo activo) ============
+   Modelo honesto y dinámico: toma los puntos que cada quien lleva en el periodo
+   y simula (Monte Carlo) los partidos que faltan. En cada partido pendiente,
+   cada participante suma puntos muestreados del historial real de puntos-por-
+   partido ya visto en el periodo (mismo reparto de la app). Así el líder no gana
+   "seguro": si alguien está cerca aún puede alcanzarlo, y quien ya no puede
+   matemáticamente sale con 0% -> "Gracias por participar". */
+function probGanarPeriodo(names, preds, res, per, diasConRes){
+  const totals={}, pool=[];
+  names.forEach(n=>{
+    let t=0;
+    diasConRes.forEach(d=>{
+      const rm=res[d.id]||[], pm=preds[n]?.[d.id];
+      rm.forEach((r,i)=>{ if(!r) return; const p=puntosPartido(pm?.[i], r, d.fecha, d.id, i); t+=p; pool.push(p); });
+    });
+    totals[n]=t;
+  });
+  let restantes=0;
+  per.dias.forEach(id=>{
+    if(diasConRes.some(d=>d.id===id)) return;      // ese día ya tiene resultados
+    if(!DIAS.some(d=>d.id===id)) return;
+    restantes += (getPartidos(id)?.length || 0);    // partidos ya programados que faltan
+  });
+  const out={}; names.forEach(n=>out[n]=0);
+  if(restantes===0 || pool.length<3){
+    const max=Math.max(...names.map(n=>totals[n]));
+    const lids=names.filter(n=>totals[n]===max && max>0);
+    names.forEach(n=> out[n]= lids.includes(n)?100/lids.length:0);
+    return {prob:out, totals, restantes, cerrada:true};
+  }
+  const NS=12000, L=pool.length, win={}; names.forEach(n=>win[n]=0);
+  for(let s=0;s<NS;s++){
+    let best=-1e9, tie=[];
+    for(const n of names){
+      let t=totals[n];
+      for(let k=0;k<restantes;k++) t += pool[(Math.random()*L)|0];
+      if(t>best){best=t;tie=[n];} else if(t===best) tie.push(n);
+    }
+    const w=1/tie.length; tie.forEach(n=> win[n]+=w);
+  }
+  names.forEach(n=> out[n]=100*win[n]/NS);
+  return {prob:out, totals, restantes, cerrada:false};
+}
 function renderEvolucion(){
   const wrap = document.getElementById("evo-chart-wrap");
   const leyenda = document.getElementById("evo-leyenda");
@@ -1577,9 +1622,13 @@ function renderEvolucion(){
   // ordenar por valor final (para colocar caritas de mayor a menor)
   const orden = [...series].sort((a,b)=> b.total - a.total);
 
+  // Probabilidad de ganar la fecha/fase seleccionada (no aplica a "Todo el torneo")
+  const mostrarProb = (evoPeriodo !== "ALL");
+  const prob = mostrarProb ? probGanarPeriodo(names, preds, res, per, diasConRes) : null;
+
   // Geometría
   const N = diasConRes.length;
-  const mL = 44, mT = 26, mB = 54, mR = 150;
+  const mL = 44, mT = 26, mB = 54, mR = 250;
   const stepX = 78;
   const plotW = (N-1) * stepX || stepX;
   const W = mL + plotW + mR;
@@ -1665,16 +1714,38 @@ function renderEvolucion(){
     } else {
       slots += `<circle cx="${colX}" cy="${cy.toFixed(1)}" r="5" fill="${s.color}" stroke="var(--bg)" stroke-width="1.5"/>`;
     }
-    slots += `<text class="evo-name" x="${(colX+slotR+8).toFixed(1)}" y="${(cy-2).toFixed(1)}">${dj}</text>`;
-    slots += `<text class="evo-tot" x="${(colX+slotR+8).toFixed(1)}" y="${(cy+12).toFixed(1)}">${s.total} pts</text>`;
+    slots += `<text class="evo-name" x="${(colX+slotR+8).toFixed(1)}" y="${(cy-3).toFixed(1)}">${dj}</text>`;
+    slots += `<text class="evo-tot" x="${(colX+slotR+8).toFixed(1)}" y="${(cy+11).toFixed(1)}">${s.total} pts</text>`;
+    if(mostrarProb){
+      const pr = Math.round(prob.prob[s.n] || 0);
+      let probTxt, cero=false;
+      if(prob.cerrada){ probTxt = pr>0 ? '🏆 ganó la fecha' : 'Gracias por participar'; cero = pr===0; }
+      else if(pr>0){ probTxt = pr+'% de ganar'; }
+      else { probTxt = 'Gracias por participar'; cero=true; }
+      slots += `<text class="evo-prob${cero?' cero':''}" x="${(colX+slotR+8).toFixed(1)}" y="${(cy+25).toFixed(1)}"${cero?'':` fill="${s.color}"`}>${probTxt}</text>`;
+    }
   });
 
   wrap.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Evolución de puntos">
     <defs>${defs}</defs>${g}${paths}${slots}
   </svg>`;
 
-  leyenda.innerHTML = orden.map(s=>`<span class="chip"><span class="dot" style="background:${s.color}"></span>${evoEsc(s.n)} <b style="color:var(--muted);font-weight:600;">(${s.total})</b></span>`).join("");
-  nota.innerHTML = `📅 <b>${per.et}</b> · ${N} día${N>1?'s':''} con resultados · ${acumular?'puntos acumulados':'puntos por día'}.`;
+  leyenda.innerHTML = orden.map(s=>{
+    let extra="";
+    if(mostrarProb){
+      const pr=Math.round(prob.prob[s.n]||0);
+      const et = prob.cerrada ? (pr>0?'🏆':'🙌 gracias') : (pr>0? pr+'%' : '🙌 gracias');
+      extra = ` <b style="color:${pr>0?s.color:'var(--muted)'};font-weight:700;">· ${et}</b>`;
+    }
+    return `<span class="chip"><span class="dot" style="background:${s.color}"></span>${evoEsc(s.n)} <b style="color:var(--muted);font-weight:600;">(${s.total})</b>${extra}</span>`;
+  }).join("");
+  let colaProb = "";
+  if(mostrarProb){
+    colaProb = prob.cerrada
+      ? ` · <b>fecha cerrada</b> — el líder se lleva la polla`
+      : ` · faltan <b>${prob.restantes}</b> partido${prob.restantes!==1?'s':''} · <b>probabilidad de ganar</b> estimada por simulación`;
+  }
+  nota.innerHTML = `📅 <b>${per.et}</b> · ${N} día${N>1?'s':''} con resultados · ${acumular?'puntos acumulados':'puntos por día'}${colaProb}.`;
 }
 
 /* ====== FOTOS DE LAS CARITAS ====== */
