@@ -144,7 +144,7 @@
 <header>
   <h1>⚽ POLLA 2026 · EN LA NUBE</h1>
   <p id="hdr-sub">Canadá · México · EE.UU. | 11 jun – 19 jul</p>
-  <p style="margin-top:6px;"><span id="conn-estado" class="estado off">● conectando…</span> <span class="hint" id="polla-id-lbl" style="display:inline;"></span></p>
+  <p style="margin-top:6px;"><span id="conn-estado" class="estado off">● conectando…</span> <span class="hint" id="polla-id-lbl" style="display:inline;"></span> <span class="hint" id="app-version" style="display:inline;"></span></p>
   <div class="tabs">
     <div class="tab active" data-p="reglas">📜 Reglas</div>
     <div class="tab" data-p="jugar">✏️ Predecir</div>
@@ -173,7 +173,7 @@
       <li>🔑 Ahora cada quien entra con <b>su nombre y su contraseña</b>. La organizadora te asigna la clave; si no la tienes, pídesela. Tu sesión queda guardada en tu equipo.</li>
       <li>📅 Se apuesta <b>cada día</b> que hay partidos. La web detecta sola el día de hoy.</li>
       <li>✏️ Entras a <b>Predecir</b>, llenas los marcadores del día y le das <b>Guardar</b>. Listo, queda en la nube.</li>
-      <li>⏱️ <b>Puedes cambiar tu predicción hasta 5 minutos después de que arranca cada partido.</b> Pasado ese momento, ese partido se cierra solo (los demás del día siguen abiertos hasta su propia hora).</li>
+      <li>⏱️ <b>Puedes guardar o cambiar tu marcador de cada partido hasta <span class="gracia-txt">5 min después del pitazo</span>.</b> Pasado ese momento, ese partido se cierra solo (los demás del día siguen abiertos hasta su propia hora).</li>
       <li>👁️ En <b>Resultados</b> puedes ver los pronósticos de los demás, pero <b>solo de los partidos que ya cerraron</b>. Mientras un partido sigue abierto, nadie ve lo que apostaron los otros.</li>
       <li>🗓️ Los días de grupos se agrupan en <b>Fechas</b> (Fecha 1: 11–17 jun · Fecha 2: 18–23 jun · Fecha 3: 24–27 jun). Hay un <b>ganador por Fecha</b> (quien más puntos hizo dentro de esa Fecha).</li>
       <li>🏆 En <b>Ranking</b> verás el <b>acumulado general</b> de todo el torneo y también el <b>ranking por Fecha</b> (cada Fecha cuenta aparte, desde 0).</li>
@@ -256,7 +256,7 @@
   <div id="res-zona" style="display:none;">
     <div class="card">
       <h2>👁️ Pronósticos de participantes <button class="mini sec" style="float:right" onclick="cargarTodo(true)">🔄 Actualizar</button></h2>
-      <p class="hint">Solo puedes ver el pronóstico de los demás en los partidos que <b>ya cerraron</b> (5 min después del pitazo). Mientras un partido sigue abierto, los pronósticos permanecen ocultos.</p>
+      <p class="hint">Solo puedes ver el pronóstico de los demás en los partidos que <b>ya cerraron</b> (cierre: <span class="gracia-txt">5 min después del pitazo</span>). Mientras un partido sigue abierto, los pronósticos permanecen ocultos.</p>
       <div class="jorn-grid" id="res-jornadas"></div>
       <p class="hint" id="res-info"></p>
       <div id="res-detalle"></div>
@@ -365,7 +365,7 @@
       <h2>Jornadas: partidos y resultados</h2>
       <div class="jorn-grid" id="a-jornadas"></div>
       <p class="hint" id="a-jorn-info"></p>
-      <p class="hint" style="margin-top:4px;">⏰ La casilla <b>HH:MM</b> de cada partido es su <b>hora de inicio</b> (huso del torneo). Cada predicción se cierra sola <b>5 min después</b> de esa hora. Déjala vacía si aún no la sabes.</p>
+      <p class="hint" style="margin-top:4px;">⏰ La casilla <b>HH:MM</b> de cada partido es su <b>hora de inicio</b> (huso del torneo). Cada predicción se cierra sola (<b class="gracia-txt">5 min después del pitazo</b>). Déjala vacía si aún no la sabes.</p>
       <div id="a-partidos"></div>
       <button class="sec" onclick="guardarHorarios()" style="margin-top:10px;">⏰ Guardar horarios de esta jornada</button>
       <details style="margin-top:10px;"><summary>➕ Agregar / editar partidos de esta jornada</summary>
@@ -397,8 +397,19 @@
         <input type="checkbox" id="a-regla-alargue" style="width:auto;margin:0;">
         <span>⏱️ <b>Bono alargue +2</b></span>
       </label>
-      <p class="hint" style="margin-top:6px;">Si <b>nadie</b> acierta el marcador exacto de 90' de un partido de <b>eliminatorias</b>, quien acierte el <b>marcador del alargue (120')</b> gana <b>+2 pts</b> (se suman a sus otros puntos del partido). Al activarla, en los partidos empatados a 90' te aparecerá una casilla extra para cargar el marcador del alargue. <b>Esta regla aplica solo a esta polla</b>; cada polla la activa por separado.</p>
-      <button class="mini" style="margin-top:8px;" onclick="guardarReglaAlargue()">Guardar regla</button>
+      <p class="hint" style="margin-top:6px;">Si <b>nadie</b> acierta el marcador exacto de 90' de un partido de <b>eliminatorias</b>, quien acierte el <b>marcador del alargue (120')</b> gana <b>+2 pts</b> (se suman a sus otros puntos del partido). Al activarla, en los partidos empatados a 90' te aparecerá una casilla extra para cargar el marcador del alargue.</p>
+      <label style="margin-top:14px;">⏰ Cierre de predicciones por partido</label>
+      <div class="flexrow" style="align-items:center;">
+        <span class="hint">Se cierra</span>
+        <input type="number" id="a-gracia-n" min="0" max="720" style="width:80px;text-align:center">
+        <select id="a-gracia-t" style="width:auto;">
+          <option value="despues">min DESPUÉS del pitazo</option>
+          <option value="antes">min ANTES del pitazo</option>
+        </select>
+      </div>
+      <p class="hint" style="margin-top:6px;">Define hasta cuándo pueden los jugadores guardar sus marcadores de cada partido (necesita la hora HH:MM cargada; sin hora, aplica la regla por día). El texto se actualiza solo en 📜 Reglas y ✏️ Predecir.</p>
+      <p class="hint" style="margin-top:4px;"><b>Estas reglas aplican solo a esta polla</b>; cada polla las define por separado.</p>
+      <button class="mini" style="margin-top:8px;" onclick="guardarReglasPolla()">💾 Guardar reglas de esta polla</button>
     </div>
 
     <div class="card">
@@ -532,7 +543,25 @@ function ptsDe(fecha){ return (fecha && fecha >= CAMBIO_PUNTAJE) ? PTS_NUEVO : P
    Se usa para cerrar cada partido 5 min después del pitazo inicial.
    Por defecto Colombia/Perú (UTC-5). Cambia este valor si tu huso es otro. */
 const TZ = "-05:00";
-const GRACIA_MIN = 5;                                       // minutos de gracia tras el pitazo
+const GRACIA_MIN = 5;                                       // minutos de gracia tras el pitazo (valor por defecto; cada polla puede cambiarlo desde Admin)
+
+/* ====== VERSIÓN DE LA APP ======
+   Cambia esta línea en cada actualización para que todos sepan si tienen la versión correcta. */
+const APP_VERSION = "🔖 v2.2 · actualizada 02-jul-2026";
+
+/* ====== CIERRE DE PREDICCIONES CONFIGURABLE (por polla) ======
+   El admin define en ⚙️ Reglas de esta polla cuántos minutos ANTES (negativo)
+   o DESPUÉS (positivo) del pitazo se cierran las predicciones de cada partido. */
+function graciaMin(){ const g=DB?.pollaCfg?.graciaMin; return (typeof g==="number" && isFinite(g)) ? g : GRACIA_MIN; }
+function graciaTxt(){ const g=graciaMin(); return g>=0 ? `${g} min después del pitazo` : `${-g} min antes del pitazo`; }
+/* Sincroniza en pantalla la versión, los textos de cierre y los controles de Admin */
+function syncReglasUI(){
+  const av=document.getElementById("app-version"); if(av) av.textContent=APP_VERSION;
+  document.querySelectorAll(".gracia-txt").forEach(e=>e.textContent=graciaTxt());
+  const rli=document.getElementById("regla-alargue-li"); if(rli) rli.style.display = reglaAlargueOn() ? "list-item" : "none";
+  const cb=document.getElementById("a-regla-alargue"); if(cb) cb.checked=reglaAlargueOn();
+  const g=graciaMin(); setv("a-gracia-n", Math.abs(g)); setv("a-gracia-t", g>=0 ? "despues" : "antes");
+}
 
 const FASES = [
   {id:"GR", nombre:"Fase de grupos",   pozo:false},
@@ -736,7 +765,7 @@ function partidoCerrado(jid, i){
   const j = DIAS.find(d=>d.id===jid); if(!j) return false;
   const hora = getHoras(jid)[i];
   const k = kickoffMs(j.fecha, hora);
-  if(k!==null) return Date.now() >= k + GRACIA_MIN*60000;  // 5 min de gracia
+  if(k!==null) return Date.now() >= k + graciaMin()*60000; // margen configurable por polla (Admin ⚙️)
   return diaCerrado(jid);                                  // sin hora: regla de día
 }
 function horaInicioTxt(jid, i){
@@ -843,7 +872,7 @@ function renderPartidosForm(prefix, jid, container){
     if(prefix==="j"){
       if(hora){
         cierreTxt = cerrado ? `🔒 cerrado (inició ${hora})`
-                            : `⏰ inicia ${hora} · editable hasta ${horaMas(hora,GRACIA_MIN)}`;
+                            : `⏰ inicia ${hora} · editable hasta ${horaMas(hora,graciaMin())}`;
       } else if(cerrado){ cierreTxt="🔒 cerrado"; }
     }
     const adminHora = prefix==="a"
@@ -923,7 +952,7 @@ function renderJugar(){
   const algunoCerrado = locks.some(Boolean);
   document.getElementById("j-jorn-info").innerHTML = todosCerrados
     ? `<b>${j.et} · ${nombreFase(j.fase)}</b>. <span style="color:var(--bad)">🔒 Todos los partidos de este día ya cerraron: no se puede editar.</span>`
-    : `<b>${j.et} · ${nombreFase(j.fase)}</b>. Predice el marcador en 90 min. Cada partido se cierra <b>${GRACIA_MIN} min después de su pitazo</b>.${algunoCerrado?' <span style="color:var(--bad)">Algunos partidos ya cerraron.</span>':''}`;
+    : `<b>${j.et} · ${nombreFase(j.fase)}</b>. Predice el marcador en 90 min. Cada partido se cierra <b>${graciaTxt()}</b>.${algunoCerrado?' <span style="color:var(--bad)">Algunos partidos ya cerraron.</span>':''}`;
   const n=renderPartidosForm("j", jSel, document.getElementById("j-partidos"));
   document.getElementById("j-sin-partidos").style.display = n? "none":"block";
 
@@ -1068,7 +1097,7 @@ async function entrarAdmin(){
     adminOK=true;
     document.getElementById("admin-login").style.display="none";
     document.getElementById("admin-zona").style.display="block";
-    const cbra=document.getElementById("a-regla-alargue"); if(cbra) cbra.checked=reglaAlargueOn();
+    syncReglasUI();
     renderAdminJornada(); renderParticipantes(); renderUsuarios();
     fillSelect("a-campeon"); if(DB.campeonReal) setv("a-campeon",DB.campeonReal);
     toast("Modo admin activado");
@@ -1124,16 +1153,19 @@ async function quitarPartido(i){
   await sbUpsert("partidos", aSel, ps);
   renderAdminJornada();
 }
-/* Guarda (en la config de ESTA polla) si la regla del alargue está activa. Cada polla la activa por separado. */
-async function guardarReglaAlargue(){
+/* Guarda (en la config de ESTA polla) las reglas propias: bono alargue y cierre de predicciones. */
+async function guardarReglasPolla(){
   const cb=document.getElementById("a-regla-alargue");
   if(!cb) return;
+  const n=parseInt(val("a-gracia-n"),10);
+  if(isNaN(n)||n<0||n>720){ toast("Minutos de cierre inválidos (usa un número de 0 a 720)",true); return; }
   const cfg=Object.assign({}, DB.pollaCfg||{});
   cfg.reglaAlargue=cb.checked;
+  cfg.graciaMin = (val("a-gracia-t")==="antes") ? -n : n;
   const {error}=await sbUpsert("polla","config",cfg);
-  if(error){ toast("No se pudo guardar la regla",true); return; }
+  if(error){ toast("No se pudieron guardar las reglas",true); return; }
   DB.pollaCfg=cfg;
-  toast(cb.checked ? "⏱️ Regla del alargue ACTIVADA en esta polla" : "Regla del alargue desactivada");
+  toast("✅ Reglas guardadas: alargue "+(cb.checked?"ACTIVADO":"desactivado")+" · cierre "+graciaTxt());
   renderAll(); renderAdminJornada();
 }
 async function guardarResultados(){
@@ -2120,8 +2152,7 @@ function renderAll(){
   const act=DIAS.find(j=>j.id===jornadaActual());
   document.getElementById("hdr-sub").innerHTML="Día en curso: <b style='color:var(--accent)'>"+act.et+"</b> · "+nombreFase(act.fase);
   renderJugar(); renderRanking(); renderParticipantes(); renderResultados(); renderEvolucion();
-  const rli=document.getElementById("regla-alargue-li"); if(rli) rli.style.display = reglaAlargueOn() ? "list-item" : "none";
-  const cbra=document.getElementById("a-regla-alargue"); if(cbra) cbra.checked = reglaAlargueOn();
+  syncReglasUI();
   if(adminOK){ renderAdminJornada(); renderUsuarios(); }
 }
 document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{
