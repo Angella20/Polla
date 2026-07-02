@@ -191,6 +191,7 @@
       <li><span class="badge-pts">2 pts</span> Solo aciertas el ganador o el empate (sin acertar la diferencia).</li>
       <li><span class="badge-pts">0 pts</span> No aciertas ni ganador ni empate.</li>
       <li><span class="badge-pts">+2 pts</span> <b>Solo en eliminatorias:</b> bono por acertar el equipo que <b>clasifica</b>, aunque el partido se defina en alargue o penales. Si predices empate, eliges a quién pasa; si predices un ganador, se toma ese. Se suma a los puntos del marcador.</li>
+      <li id="regla-alargue-li" style="display:none"><span class="badge-pts">+2 pts</span> ⏱️ <b>Regla del alargue (activa en esta polla):</b> si <b>nadie</b> acierta el marcador exacto de 90' de un partido de eliminatorias, quien haya acertado el <b>marcador del alargue (120')</b> gana +2. Se suma a los demás puntos del partido.</li>
       <li><span class="badge-pts">10 pts</span> Campeón del mundo (se paga al final).</li>
     </ul>
     <p class="hint" style="margin-top:8px;">📌 La <b>Fecha 1</b> (11–17 jun) ya cerró con su sistema original (3 pts exacto · 1 pt ganador) y su ganador quedó definido; no se recalcula. En eliminatorias cuenta el resultado en 90' (el empate vale aunque haya penales) y se suma el <b>bono +2</b> por acertar quién clasifica. Desempate del ranking: más marcadores exactos; luego, quien acertó al campeón.</p>
@@ -259,6 +260,12 @@
       <div class="jorn-grid" id="res-jornadas"></div>
       <p class="hint" id="res-info"></p>
       <div id="res-detalle"></div>
+    </div>
+    <div class="card">
+      <h2>⚽ Actualizar marcadores del día</h2>
+      <p class="hint">Cualquier integrante puede traer los <b>marcadores oficiales (90')</b> del día seleccionado arriba y publicarlos para todos. Se leen de la base pública <b>openfootball</b>; no se pueden escribir a mano (eso solo desde Admin).</p>
+      <button class="sec" onclick="actualizarMarcadoresMiembro(resSel)">⚽ Traer y publicar marcadores de este día</button>
+      <div id="res-api-log" class="hint" style="margin-top:8px;"></div>
     </div>
   </div>
 </div>
@@ -385,6 +392,16 @@
     </div>
 
     <div class="card">
+      <h2>⚙️ Reglas de esta polla</h2>
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+        <input type="checkbox" id="a-regla-alargue" style="width:auto;margin:0;">
+        <span>⏱️ <b>Bono alargue +2</b></span>
+      </label>
+      <p class="hint" style="margin-top:6px;">Si <b>nadie</b> acierta el marcador exacto de 90' de un partido de <b>eliminatorias</b>, quien acierte el <b>marcador del alargue (120')</b> gana <b>+2 pts</b> (se suman a sus otros puntos del partido). Al activarla, en los partidos empatados a 90' te aparecerá una casilla extra para cargar el marcador del alargue. <b>Esta regla aplica solo a esta polla</b>; cada polla la activa por separado.</p>
+      <button class="mini" style="margin-top:8px;" onclick="guardarReglaAlargue()">Guardar regla</button>
+    </div>
+
+    <div class="card">
       <h2>Campeón real (al final del torneo)</h2>
       <select id="a-campeon"></select>
       <button class="mini" style="margin-top:8px;" onclick="guardarCampeon()">Guardar campeón</button>
@@ -486,6 +503,29 @@ const PTS_VIEJO = {exacto:3, resultado:1, campeon:10};
 const PTS_NUEVO = {exacto:5, diferencia:3, resultado:2, campeon:10};
 const PTS = PTS_NUEVO;                                      // campeon=10 (común a ambos)
 const BONO_CLASIF = 2;                                      // bono en eliminatorias: acertar el equipo que clasifica (90' empatado → alargue/penales)
+const BONO_ALARGUE = 2;                                     // regla opcional por polla: si NADIE acierta el 90' exacto, +2 a quien acierte el marcador del alargue (120')
+/* ====== REGLA DEL ALARGUE (opcional, por polla) ======
+   Se activa desde Admin y se guarda en la config de ESTA polla (nube).
+   Formato del resultado de un partido: [golesA, golesB, quienAvanza?, alargueA?, alargueB?] */
+function reglaAlargueOn(){ return DB?.pollaCfg?.reglaAlargue === true; }
+function alargueDe(rm){ return (rm && rm.length>=5 && rm[3]!=null && rm[4]!=null) ? [rm[3], rm[4]] : null; }
+/* ¿Ningún participante acertó el marcador exacto de 90' del partido i del día jid? */
+function nadieExacto90(jid, i, rm){
+  const preds = DB?.preds || {};
+  for(const n of Object.keys(preds)){
+    const pm = preds[n]?.[jid]?.[i];
+    if(pm && pm[0]===rm[0] && pm[1]===rm[1]) return false;
+  }
+  return true;
+}
+/* +2 si la regla está activa, hay marcador de alargue, nadie acertó el 90' exacto y este jugador acertó el alargue */
+function bonoAlargue(pm, rm, jid, i){
+  if(!reglaAlargueOn() || jid===undefined || !esElim(jid)) return 0;
+  if(!pm || !rm) return 0;
+  const et = alargueDe(rm);
+  if(!et) return 0;
+  return (pm[0]===et[0] && pm[1]===et[1] && nadieExacto90(jid, i, rm)) ? BONO_ALARGUE : 0;
+}
 function ptsDe(fecha){ return (fecha && fecha >= CAMBIO_PUNTAJE) ? PTS_NUEVO : PTS_VIEJO; }
 
 /* ====== ZONA HORARIA DEL TORNEO ======
@@ -826,6 +866,10 @@ function renderPartidosForm(prefix, jid, container){
           <option value="0">${p[0]}</option>
           <option value="1">${p[1]}</option>
         </select>
+        ${prefix==="a" && reglaAlargueOn() ? `<span class="clasif-q" title="Marcador al final del alargue (120'). Déjalo vacío si se definió sin goles extra o en penales con el mismo marcador.">⏱️ Alargue (120'):</span>
+        <input type="number" min="0" max="20" id="a-e${i}a" placeholder="-" style="width:48px;text-align:center">
+        <span>—</span>
+        <input type="number" min="0" max="20" id="a-e${i}b" placeholder="-" style="width:48px;text-align:center">` : ""}
       </div>` : ""}
       ${prefix==="j" ? `<div class="h2h-wrap">
         <button class="mini sec h2h-btn" onclick="toggleH2H(this,'${jsArg(p[0])}','${jsArg(p[1])}')">📊 Últimos 5 enfrentamientos</button>
@@ -842,6 +886,10 @@ function leerMarcadores(prefix, n, jid){
     if(a!==""&&b!==""){
       const sc=[+a,+b];
       if(elim && +a===+b){ const q=val(prefix+"-q"+i); if(q==="0"||q==="1") sc.push(+q); }  // empate en KO → guarda el clasificado elegido
+      if(prefix==="a" && elim && +a===+b){                                                  // marcador del alargue (regla opcional)
+        const ea=val("a-e"+i+"a"), eb=val("a-e"+i+"b");
+        if(ea!==""&&eb!==""){ if(sc.length<3) sc[2]=null; sc[3]=+ea; sc[4]=+eb; }
+      }
       arr.push(sc);
     } else arr.push(null);
   }
@@ -1020,6 +1068,7 @@ async function entrarAdmin(){
     adminOK=true;
     document.getElementById("admin-login").style.display="none";
     document.getElementById("admin-zona").style.display="block";
+    const cbra=document.getElementById("a-regla-alargue"); if(cbra) cbra.checked=reglaAlargueOn();
     renderAdminJornada(); renderParticipantes(); renderUsuarios();
     fillSelect("a-campeon"); if(DB.campeonReal) setv("a-campeon",DB.campeonReal);
     toast("Modo admin activado");
@@ -1056,7 +1105,7 @@ function renderAdminJornada(){
   document.getElementById("a-jorn-info").innerHTML=`<b>${j.et} · ${nombreFase(j.fase)}</b>. Ingresa aquí los <b>resultados reales</b>.`;
   renderPartidosForm("a", aSel, document.getElementById("a-partidos"));
   const r=DB.res?.[aSel];
-  if(r) r.forEach((m,i)=>{ if(m){setv("a-m"+i+"a",m[0]); setv("a-m"+i+"b",m[1]); if(m[2]===0||m[2]===1)setv("a-q"+i,m[2]); onScore("a",i);} });
+  if(r) r.forEach((m,i)=>{ if(m){setv("a-m"+i+"a",m[0]); setv("a-m"+i+"b",m[1]); if(m[2]===0||m[2]===1)setv("a-q"+i,m[2]); if(m.length>=5&&m[3]!=null){setv("a-e"+i+"a",m[3]); setv("a-e"+i+"b",m[4]);} onScore("a",i);} });
 }
 async function agregarPartido(){
   const e1=val("a-eq1"), e2=val("a-eq2");
@@ -1074,6 +1123,18 @@ async function quitarPartido(i){
   if(DB.horas?.[aSel]){ DB.horas[aSel].splice(i,1); await sbUpsert("hora", aSel, DB.horas[aSel]); }
   await sbUpsert("partidos", aSel, ps);
   renderAdminJornada();
+}
+/* Guarda (en la config de ESTA polla) si la regla del alargue está activa. Cada polla la activa por separado. */
+async function guardarReglaAlargue(){
+  const cb=document.getElementById("a-regla-alargue");
+  if(!cb) return;
+  const cfg=Object.assign({}, DB.pollaCfg||{});
+  cfg.reglaAlargue=cb.checked;
+  const {error}=await sbUpsert("polla","config",cfg);
+  if(error){ toast("No se pudo guardar la regla",true); return; }
+  DB.pollaCfg=cfg;
+  toast(cb.checked ? "⏱️ Regla del alargue ACTIVADA en esta polla" : "Regla del alargue desactivada");
+  renderAll(); renderAdminJornada();
 }
 async function guardarResultados(){
   const ps=getPartidos(aSel);
@@ -1238,11 +1299,12 @@ function puntosJornada(predM, resM, fecha, jid){
     else if(P.diferencia!==undefined && (pm[0]-pm[1])===(rm[0]-rm[1])){ pts+=P.diferencia; }
     else if(Math.sign(pm[0]-pm[1])===Math.sign(rm[0]-rm[1])){ pts+=P.resultado; }
     if(elim){ const cr=avanzaDe(rm), cp=avanzaDe(pm); if(cr!==null && cp!==null && cr===cp) pts+=BONO_CLASIF; }   // bono +2 por acertar quién clasifica
+    pts+=bonoAlargue(pm, rm, jid, i);                                                                            // regla opcional: +2 por acertar el alargue
   });
   return {pts,ex};
 }
 /* Puntos de UN solo partido (para la pestaña Resultados) */
-function puntosPartido(pm, rm, fecha, jid){
+function puntosPartido(pm, rm, fecha, jid, i){
   if(!pm||!rm) return 0;
   const P=ptsDe(fecha);
   let pts=0;
@@ -1250,6 +1312,7 @@ function puntosPartido(pm, rm, fecha, jid){
   else if(P.diferencia!==undefined && (pm[0]-pm[1])===(rm[0]-rm[1])) pts=P.diferencia;
   else if(Math.sign(pm[0]-pm[1])===Math.sign(rm[0]-rm[1])) pts=P.resultado;
   if(jid!==undefined && esElim(jid)){ const cr=avanzaDe(rm), cp=avanzaDe(pm); if(cr!==null && cp!==null && cr===cp) pts+=BONO_CLASIF; }
+  pts+=bonoAlargue(pm, rm, jid, i);
   return pts;
 }
 /* Ganador(es) de una Fecha (ronda de grupos), a partir de las filas ya calculadas */
@@ -1361,17 +1424,20 @@ function renderResultados(){
     }
     let avTxt="";
     if(rm && esElim(resSel) && rm[0]===rm[1]){ const av=avanzaDe(rm); if(av!==null) avTxt=` · ✅ avanza <b>${p[av]}</b>`; }
+    const etr = rm ? alargueDe(rm) : null;
+    if(etr) avTxt+=` · ⏱️ alargue <b>${etr[0]} - ${etr[1]}</b>`;
     html+=`<p class="hint">Resultado real: <b>${rm?`${rm[0]} - ${rm[1]}`:"pendiente de cargar"}</b>${avTxt}</p>`;
     let filas="";
     names.forEach(n=>{
       const pm=preds[n]?.[resSel]?.[i];
       if(!pm) return;
-      const pts = rm ? puntosPartido(pm, rm, j.fecha, resSel) : null;
+      const pts = rm ? puntosPartido(pm, rm, j.fecha, resSel, i) : null;
       const mio = n===SESION.nombre;
       let pickTxt="";
       if(esElim(resSel) && pm[0]===pm[1] && (pm[2]===0||pm[2]===1)) pickTxt=` <span class="hint">→ ${p[pm[2]]}</span>`;
       let bonoTxt="";
       if(rm && esElim(resSel)){ const cr=avanzaDe(rm), cp=avanzaDe(pm); if(cr!==null && cp!==null && cr===cp) bonoTxt=" <span class='ok' title='incluye +2 por acertar el clasificado'>✓</span>"; }
+      if(rm && bonoAlargue(pm, rm, resSel, i)>0) bonoTxt+=" <span class='ok' title='incluye +2 por acertar el marcador del alargue (nadie acertó el 90 exacto)'>⏱️</span>";
       filas+=`<tr class="${mio?'pos1':''}"><td>${n}${mio?" (tú)":""}</td><td><b>${pm[0]} - ${pm[1]}</b>${pickTxt}</td><td>${pts!==null?pts+bonoTxt:"<span class='hint'>—</span>"}</td></tr>`;
     });
     html+=`<table><tr><th>Participante</th><th>Pronóstico</th><th>Pts</th></tr>${filas||"<tr><td colspan='3' class='hint'>Nadie pronosticó este partido.</td></tr>"}</table></div>`;
@@ -1734,6 +1800,13 @@ async function traerResultadosAPI(jid){
     const visitaGoals = swap? g1 : g2;
     setv("a-m"+i+"a", localGoals);
     setv("a-m"+i+"b", visitaGoals);
+    onScore("a",i);
+    // si la regla del alargue está activa y la fuente trae el marcador de 120', se llena también
+    const et=hit.score?.et;
+    if(reglaAlargueOn() && esElim(jid) && localGoals===visitaGoals && Array.isArray(et) && et[0]!=null && et[1]!=null){
+      setv("a-e"+i+"a", swap?et[1]:et[0]);
+      setv("a-e"+i+"b", swap?et[0]:et[1]);
+    }
     llenos++;
   });
 
@@ -1741,6 +1814,68 @@ async function traerResultadosAPI(jid){
   if(pendientes.length) msg+=`<br>⏳ Aún sin marcador (no terminados): ${pendientes.join(", ")}.`;
   if(noMatch.length) msg+=`<br>❓ No pude emparejar (revisa el nombre del equipo): ${noMatch.join(", ")}.`;
   if(log) log.innerHTML=msg;
+}
+
+/* ============ ACTUALIZACIÓN DE MARCADORES POR INTEGRANTES ============
+   Cualquier participante con sesión iniciada puede traer los marcadores
+   oficiales (90') de la fuente pública y publicarlos en la nube.
+   No permite escribir marcadores a mano (eso solo desde Admin), así que
+   no hay riesgo de manipulación: solo se copia lo que dice la fuente.
+   Conserva lo que el admin ya haya cargado (quién avanza, alargue). */
+async function actualizarMarcadoresMiembro(jid){
+  const log=document.getElementById("res-api-log");
+  if(!SESION.nombre){ toast("Inicia sesión en ✏️ Predecir primero",true); return; }
+  const j=DIAS.find(d=>d.id===jid);
+  const ps=getPartidos(jid);
+  if(!ps.length){ if(log) log.innerHTML="<span class='warn'>Este día no tiene partidos cargados todavía.</span>"; return; }
+  if(log) log.innerHTML=`Buscando marcadores del ${j.fecha}…`;
+  let all;
+  try{ all=await ofMatches(); }
+  catch(e){ if(log) log.innerHTML="<span class='warn'>No se pudo leer la fuente (posible bloqueo de red o sin internet): "+e.message+"</span>"; return; }
+  const delDia = all.filter(m=>m.date===j.fecha);
+  if(!delDia.length){ if(log) log.innerHTML=`La fuente no tiene partidos para el ${j.fecha} todavía.`; return; }
+
+  const prev=(DB.res?.[jid])||[];
+  const m=[]; let llenos=0, pendientes=[], noMatch=[];
+  ps.forEach((p,i)=>{
+    const ex=prev[i]||null;
+    let hit=null, swap=false;
+    for(const q of delDia){
+      const mh=apiTeamToApp(q.team1), ma=apiTeamToApp(q.team2);
+      if(mh===p[0] && ma===p[1]){ hit=q; swap=false; break; }
+      if(mh===p[1] && ma===p[0]){ hit=q; swap=true; break; }
+    }
+    if(!hit){ noMatch.push(`${p[0]} vs ${p[1]}`); m.push(ex); return; }
+    const ft=hit.score?.ft;
+    if(!Array.isArray(ft)||ft.length<2||ft[0]==null||ft[1]==null){ pendientes.push(`${p[0]} vs ${p[1]}`); m.push(ex); return; }
+    const a=swap?ft[1]:ft[0], b=swap?ft[0]:ft[1];
+    const sc=[a,b];
+    // conserva lo ya cargado por el admin si el 90' coincide (quién avanza, alargue)
+    if(ex && ex[0]===a && ex[1]===b){
+      if(ex[2]===0||ex[2]===1) sc[2]=ex[2];
+      if(ex.length>=5 && ex[3]!=null){ if(sc.length<3) sc[2]=null; sc[3]=ex[3]; sc[4]=ex[4]; }
+    }
+    // si la regla del alargue está activa y la fuente trae el 120', se publica también
+    const et=hit.score?.et;
+    if(reglaAlargueOn() && esElim(jid) && a===b && Array.isArray(et) && et[0]!=null && et[1]!=null){
+      if(sc.length<3) sc[2]=(ex&&(ex[2]===0||ex[2]===1))?ex[2]:null;
+      sc[3]=swap?et[1]:et[0]; sc[4]=swap?et[0]:et[1];
+      if(sc[2]==null && sc[3]!==sc[4]) sc[2] = sc[3]>sc[4] ? 0 : 1;   // si el alargue no quedó empatado, ese equipo avanza
+    }
+    m.push(sc); llenos++;
+  });
+  if(!llenos){
+    if(log) log.innerHTML="⏳ Ningún partido de este día tiene marcador final en la fuente todavía."+(pendientes.length?`<br>Pendientes: ${pendientes.join(", ")}.`:"");
+    return;
+  }
+  DB.res[jid]=m;
+  const {error}=await sbUpsert("res", jid, m);
+  if(error){ if(log) log.innerHTML="<span class='warn'>No se pudo guardar en la nube. Intenta de nuevo.</span>"; return; }
+  let msg=`✅ Publicado: <b>${llenos}</b> de ${ps.length} marcador(es) de <b>${j.et}</b>. Ya le aparecen a todos.`;
+  if(pendientes.length) msg+=`<br>⏳ Sin terminar: ${pendientes.join(", ")}.`;
+  if(noMatch.length) msg+=`<br>❓ No emparejados (los carga el admin): ${noMatch.join(", ")}.`;
+  if(log) log.innerHTML=msg;
+  toast("Marcadores publicados"); renderResultados(); renderRanking();
 }
 
 /* ============ HISTORIAL (head-to-head) ============
@@ -1985,6 +2120,8 @@ function renderAll(){
   const act=DIAS.find(j=>j.id===jornadaActual());
   document.getElementById("hdr-sub").innerHTML="Día en curso: <b style='color:var(--accent)'>"+act.et+"</b> · "+nombreFase(act.fase);
   renderJugar(); renderRanking(); renderParticipantes(); renderResultados(); renderEvolucion();
+  const rli=document.getElementById("regla-alargue-li"); if(rli) rli.style.display = reglaAlargueOn() ? "list-item" : "none";
+  const cbra=document.getElementById("a-regla-alargue"); if(cbra) cbra.checked = reglaAlargueOn();
   if(adminOK){ renderAdminJornada(); renderUsuarios(); }
 }
 document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{
