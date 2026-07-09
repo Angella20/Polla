@@ -151,6 +151,7 @@
     <div class="tab active" data-p="reglas">📜 Reglas</div>
     <div class="tab" data-p="jugar">✏️ Predecir</div>
     <div class="tab" data-p="resultados">👁️ Resultados</div>
+    <div class="tab" data-p="log">🕓 Log</div>
     <div class="tab" data-p="ranking">🏆 Ranking</div>
     <div class="tab" data-p="evolucion">📈 Evolución</div>
     <div class="tab" data-p="cruce">🏆 Cruce</div>
@@ -268,6 +269,27 @@
       <p class="hint">Cualquier integrante puede traer los <b>marcadores oficiales (90')</b> del día seleccionado arriba y publicarlos para todos. Se leen de la base pública <b>openfootball</b>; no se pueden escribir a mano (eso solo desde Admin).</p>
       <button class="sec" onclick="actualizarMarcadoresMiembro(resSel)">⚽ Traer y publicar marcadores de este día</button>
       <div id="res-api-log" class="hint" style="margin-top:8px;"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= LOG DE PREDICCIONES ================= -->
+<div class="panel" id="p-log">
+  <div class="card" id="log-login-aviso" style="display:none;">
+    <h2>🕓 Log de predicciones</h2>
+    <p class="hint">Inicia sesión en la pestaña <b>✏️ Predecir</b> para ver el registro de predicciones y sus horarios.</p>
+  </div>
+  <div id="log-zona" style="display:none;">
+    <div class="card">
+      <h2>🕓 Log de predicciones <button class="mini sec" style="float:right" onclick="cargarTodo(true)">🔄 Actualizar</button></h2>
+      <p class="hint">Registro de <b>qué marcador predijo cada participante y a qué hora lo guardó</b> (huso del torneo, UTC−5). Por transparencia, cada predicción aparece <b>solo cuando su partido ya cerró</b> (igual que en 👁️ Resultados). Las predicciones hechas antes de esta actualización no tienen hora registrada y aparecen como <b>—</b>.</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:10px 0;">
+        <label style="font-size:.82rem;color:var(--muted)">Participante:</label>
+        <select id="log-part" onchange="renderLog()" style="min-width:150px"></select>
+        <label style="font-size:.82rem;color:var(--muted)">Día:</label>
+        <select id="log-dia" onchange="renderLog()" style="min-width:150px"></select>
+      </div>
+      <div id="log-tabla"></div>
     </div>
   </div>
 </div>
@@ -705,9 +727,13 @@ const DIAS = [
   {id:"D07", fase:"R16", fecha:"2026-07-07", et:"Mar 7 jul", horas:["11:00","15:00"], partidos:[
     ["Argentina","Egipto","Atlanta"],
     ["Suiza","Colombia","Vancouver"]]},
-  {id:"D09", fase:"QF", fecha:"2026-07-09", et:"Jue 9 jul", partidos:[]},
-  {id:"D10", fase:"QF", fecha:"2026-07-10", et:"Vie 10 jul", partidos:[]},
-  {id:"D11J",fase:"QF", fecha:"2026-07-11", et:"Sáb 11 jul", partidos:[]},
+  {id:"D09", fase:"QF", fecha:"2026-07-09", et:"Jue 9 jul", horas:["15:00"], partidos:[
+    ["Marruecos","Francia","Boston"]]},
+  {id:"D10", fase:"QF", fecha:"2026-07-10", et:"Vie 10 jul", horas:["14:00"], partidos:[
+    ["Bélgica","España","Los Ángeles"]]},
+  {id:"D11J",fase:"QF", fecha:"2026-07-11", et:"Sáb 11 jul", horas:["16:00","20:00"], partidos:[
+    ["Noruega","Inglaterra","Miami"],
+    ["Argentina","Suiza","Kansas City"]]},
   {id:"D14J",fase:"SF", fecha:"2026-07-14", et:"Mar 14 jul · Semifinal 1", partidos:[]},
   {id:"D15J",fase:"SF", fecha:"2026-07-15", et:"Mié 15 jul · Semifinal 2", partidos:[]},
   {id:"D18J",fase:"SF", fecha:"2026-07-18", et:"Sáb 18 jul · 3er puesto", partidos:[]},
@@ -725,7 +751,7 @@ function nombreFase(fid){ return FASES.find(f=>f.id===fid)?.nombre||fid; }
      campeonReal: "País"
    }
 ============================================================ */
-let DB = {partidos:{}, res:{}, preds:{}, campeones:{}, campeonReal:"", horas:{}, auth:{}, pollaCfg:null};
+let DB = {partidos:{}, res:{}, preds:{}, predsTs:{}, campeones:{}, campeonReal:"", horas:{}, auth:{}, pollaCfg:null};
 let cargando = false;
 
 /* localStorage solo para mi borrador / mi nombre local */
@@ -813,12 +839,12 @@ async function sbDelete(scope, clave){
   await sb.from("polla_kv").delete().match({polla_id:POLLA_ID, scope, clave});
 }
 async function cargarTodo(avisar){
-  if(!sb){ DB = Object.assign({partidos:{},res:{},preds:{},campeones:{},campeonReal:"",horas:{},auth:{},caritas:{},pollaCfg:null}, loadLocal().DB||{}); if(!DB.caritas) DB.caritas={}; renderAll(); return; }
+  if(!sb){ DB = Object.assign({partidos:{},res:{},preds:{},predsTs:{},campeones:{},campeonReal:"",horas:{},auth:{},caritas:{},pollaCfg:null}, loadLocal().DB||{}); if(!DB.caritas) DB.caritas={}; if(!DB.predsTs) DB.predsTs={}; renderAll(); return; }
   cargando = true; setConn("cargando");
   const {data, error} = await sb.from("polla_kv").select("scope,clave,valor").eq("polla_id", POLLA_ID);
   cargando = false;
   if(error){ setConn("error"); if(avisar) toast("No se pudo leer la nube",true); console.error(error); return; }
-  const nuevo = {partidos:{}, res:{}, preds:{}, campeones:{}, campeonReal:"", horas:{}, auth:{}, caritas:{}, pollaCfg:null};
+  const nuevo = {partidos:{}, res:{}, preds:{}, predsTs:{}, campeones:{}, campeonReal:"", horas:{}, auth:{}, caritas:{}, pollaCfg:null};
   for(const row of (data||[])){
     if(row.scope==="partidos") nuevo.partidos[row.clave]=row.valor;
     else if(row.scope==="res") nuevo.res[row.clave]=row.valor;
@@ -833,6 +859,8 @@ async function cargarTodo(avisar){
       const nombre=row.clave.slice(0,sep), dia=row.clave.slice(sep+1);
       nuevo.preds[nombre]=nuevo.preds[nombre]||{};
       nuevo.preds[nombre][dia]=row.valor?.m||null;
+      nuevo.predsTs[nombre]=nuevo.predsTs[nombre]||{};
+      nuevo.predsTs[nombre][dia]=row.valor?.ts||null;   // horas de registro por partido (epoch ms); null en predicciones viejas
       if(row.valor?.c && !nuevo.campeones[nombre]) nuevo.campeones[nombre]=row.valor.c;
     }
   }
@@ -1048,9 +1076,19 @@ async function guardarPrediccion(){
   const local=loadLocal(); local.borr=local.borr||{}; local.borr[jSel]=m;
   local.miNombre=nombre; local.miCampeon=campElegido; saveLocal(local);
 
+  // sello de tiempo por partido: registra/actualiza la hora SOLO del marcador que cambió
+  const now = Date.now();
+  const prevTs = (DB.predsTs?.[nombre]?.[jSel]) || [];
+  const ts = ps.map((_,i)=>{
+    if(locks[i]) return prevTs[i]||null;                    // partido cerrado: conserva su hora previa
+    if(!m[i]) return null;                                   // aún sin marcador
+    const cambio = JSON.stringify(m[i])!==JSON.stringify(prev[i]||null);
+    return (cambio || !prevTs[i]) ? now : prevTs[i];         // hora nueva solo si cambió (o si nunca tuvo)
+  });
+
   const btn=document.getElementById("j-btn-guardar"); btn.disabled=true;
   aviso.innerHTML="<span class='hint'>Guardando…</span>";
-  const {error} = await sbUpsert("pred", nombre+"|"+jSel, {m, c:campElegido});
+  const {error} = await sbUpsert("pred", nombre+"|"+jSel, {m, c:campElegido, ts});
   btn.disabled=false;
   if(error){
     aviso.innerHTML="<span class='warn'>⚠️ No se pudo guardar en la nube. Revisa tu internet. (Tu borrador quedó en este equipo.)</span>";
@@ -1058,6 +1096,7 @@ async function guardarPrediccion(){
   }
   // refrescar estado local de la nube
   DB.preds[nombre]=DB.preds[nombre]||{}; DB.preds[nombre][jSel]=m;
+  DB.predsTs[nombre]=DB.predsTs[nombre]||{}; DB.predsTs[nombre][jSel]=ts;
   if(!DB.campeones[nombre]) DB.campeones[nombre]=campElegido;
   aviso.innerHTML="<span class='ok'>✅ ¡Predicción guardada en la nube para "+j_etiqueta(jSel)+"!</span>";
   toast("Predicción guardada");
@@ -1485,6 +1524,97 @@ function renderResultados(){
     html+=`<table><tr><th>Participante</th><th>Pronóstico</th><th>Pts</th></tr>${filas||"<tr><td colspan='3' class='hint'>Nadie pronosticó este partido.</td></tr>"}</table></div>`;
   });
   det.innerHTML=html;
+}
+
+/* ============ LOG DE PREDICCIONES (con horarios) ============
+   Registro de qué marcador guardó cada participante y a qué hora (huso torneo UTC-5).
+   Respeta el cierre: una predicción solo se revela cuando su partido ya cerró. */
+function fmtTsLog(ms){
+  if(!ms || !isFinite(ms)) return "—";
+  try{
+    return new Date(ms).toLocaleString("es-CO",{timeZone:"America/Bogota",day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit",hour12:false});
+  }catch(e){
+    const d=new Date(ms); return isNaN(d)?"—":d.toISOString().slice(0,16).replace("T"," ");
+  }
+}
+let logPart="__todos__", logDia="__todos__";
+function renderLog(){
+  const aviso=document.getElementById("log-login-aviso");
+  const zona=document.getElementById("log-zona");
+  if(!aviso||!zona) return;
+  if(!SESION.nombre){ aviso.style.display="block"; zona.style.display="none"; return; }
+  aviso.style.display="none"; zona.style.display="block";
+
+  const preds=DB.preds||{}, tsAll=DB.predsTs||{};
+  const names=Object.keys(preds).sort((a,b)=>a.localeCompare(b));
+
+  // días con al menos un partido ya cerrado (los únicos que pueden mostrarse)
+  const diasConLog = DIAS.filter(d=>{
+    const ps=getPartidos(d.id); if(!ps.length) return false;
+    return ps.some((_,i)=>partidoCerrado(d.id,i));
+  });
+
+  // selector de participante
+  const selP=document.getElementById("log-part");
+  if(selP){
+    selP.innerHTML=`<option value="__todos__"${logPart==="__todos__"?" selected":""}>Todos</option>`+
+      names.map(n=>{const v=encodeURIComponent(n); return `<option value="${v}"${v===logPart?" selected":""}>${n}</option>`;}).join("");
+  }
+  // selector de día
+  const selD=document.getElementById("log-dia");
+  if(selD){
+    if(logDia!=="__todos__" && !diasConLog.some(d=>d.id===logDia)) logDia="__todos__";
+    selD.innerHTML=`<option value="__todos__"${logDia==="__todos__"?" selected":""}>Todos</option>`+
+      diasConLog.map(d=>`<option value="${d.id}"${d.id===logDia?" selected":""}>${d.et}</option>`).join("");
+  }
+  const filtroPart = selP ? selP.value : logPart;  logPart=filtroPart;
+  const filtroDia  = selD ? selD.value : logDia;   logDia=filtroDia;
+
+  // construir entradas del log
+  const entradas=[];
+  names.forEach(n=>{
+    if(filtroPart!=="__todos__" && encodeURIComponent(n)!==filtroPart) return;
+    const diasP=preds[n]||{};
+    Object.keys(diasP).forEach(dia=>{
+      if(filtroDia!=="__todos__" && filtroDia!==dia) return;
+      const d=DIAS.find(x=>x.id===dia); if(!d) return;
+      const ps=getPartidos(dia);
+      const arr=diasP[dia]||[];
+      const tsArr=tsAll?.[n]?.[dia]||[];
+      arr.forEach((pm,i)=>{
+        if(!pm) return;
+        if(!partidoCerrado(dia,i)) return;          // no revelar antes del cierre
+        const p=ps[i]; if(!p) return;
+        let pickTxt="";
+        if(esElim(dia) && pm[0]===pm[1] && (pm[2]===0||pm[2]===1)) pickTxt=` <span class="hint">→ ${p[pm[2]]}</span>`;
+        entradas.push({ t:tsArr[i]||null, n, etDia:d.et, p, pm, pickTxt });
+      });
+    });
+  });
+
+  // más recientes primero; las sin hora (predicciones viejas) al final
+  entradas.sort((a,b)=>{
+    if(a.t && b.t) return b.t-a.t;
+    if(a.t && !b.t) return -1;
+    if(!a.t && b.t) return 1;
+    return a.n.localeCompare(b.n) || a.etDia.localeCompare(b.etDia);
+  });
+
+  const cont=document.getElementById("log-tabla");
+  if(!entradas.length){ cont.innerHTML="<p class='hint'>Aún no hay predicciones en partidos cerrados para mostrar.</p>"; return; }
+  const filas=entradas.map(e=>{
+    const mio=e.n===SESION.nombre;
+    return `<tr class="${mio?'pos1':''}">
+      <td style="white-space:nowrap">${fmtTsLog(e.t)}</td>
+      <td>${e.n}${mio?" (tú)":""}</td>
+      <td style="font-size:.8rem">${flagImg(e.p[0])} ${e.p[0]} <span class="hint">vs</span> ${flagImg(e.p[1])} ${e.p[1]} <span class="hint">· ${e.etDia}</span></td>
+      <td style="white-space:nowrap"><b>${e.pm[0]} - ${e.pm[1]}</b>${e.pickTxt}</td>
+    </tr>`;
+  }).join("");
+  cont.innerHTML=`<div style="overflow-x:auto"><table>
+    <tr><th>Hora registrada</th><th>Participante</th><th>Partido</th><th>Marcador</th></tr>
+    ${filas}</table></div>
+    <p class="hint" style="margin-top:6px;">${entradas.length} predicci${entradas.length===1?"ón":"ones"} mostrada${entradas.length===1?"":"s"} · hora en huso del torneo (UTC−5).</p>`;
 }
 
 /* ============ RANKING POR FECHA / FASE (independiente, desde 0) ============ */
@@ -2230,7 +2360,7 @@ function renderAll(){
     DIAS.map(j=>`<tr ${j.id===jornadaActual()?"class='pos1'":""}><td>${j.et}</td><td>${nombreFase(j.fase)}</td><td>${getPartidos(j.id).length||"por definir"}</td></tr>`).join("")+"</table>";
   const act=DIAS.find(j=>j.id===jornadaActual());
   document.getElementById("hdr-sub").innerHTML="Día en curso: <b style='color:var(--accent)'>"+act.et+"</b> · "+nombreFase(act.fase);
-  renderJugar(); renderRanking(); renderParticipantes(); renderResultados(); renderEvolucion();
+  renderJugar(); renderRanking(); renderParticipantes(); renderResultados(); renderEvolucion(); renderLog();
   syncReglasUI();
   if(adminOK){ renderAdminJornada(); renderUsuarios(); }
 }
@@ -2244,6 +2374,7 @@ document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{
   else if(t.dataset.p==="jugar") renderJugar();
   else if(t.dataset.p==="evolucion") renderEvolucion();
   else if(t.dataset.p==="cruce") renderCruce();
+  else if(t.dataset.p==="log") renderLog();
 });
 // recalcular el gráfico al cambiar las opciones
 ["evo-acum","evo-caritas"].forEach(id=>{
