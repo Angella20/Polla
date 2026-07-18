@@ -738,8 +738,10 @@ const DIAS = [
     ["Francia","España","Dallas"]]},
   {id:"D15J",fase:"SF", fecha:"2026-07-15", et:"Mié 15 jul · Semifinal 2", horas:["14:00"], partidos:[
     ["Inglaterra","Argentina","Atlanta"]]},
-  {id:"D18J",fase:"SF", fecha:"2026-07-18", et:"Sáb 18 jul · 3er puesto", partidos:[]},
-  {id:"D19J",fase:"SF", fecha:"2026-07-19", et:"Dom 19 jul · FINAL", partidos:[]}
+  {id:"D18J",fase:"SF", fecha:"2026-07-18", et:"Sáb 18 jul · 3er puesto", horas:["16:00"], partidos:[
+    ["Francia","Inglaterra","Miami"]]},
+  {id:"D19J",fase:"SF", fecha:"2026-07-19", et:"Dom 19 jul · FINAL", horas:["14:00"], partidos:[
+    ["España","Argentina","Nueva York"]]}
 ];
 function faseDe(did){ return DIAS.find(d=>d.id===did)?.fase; }
 function nombreFase(fid){ return FASES.find(f=>f.id===fid)?.nombre||fid; }
