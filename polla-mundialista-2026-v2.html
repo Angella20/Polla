@@ -1684,6 +1684,30 @@ function pickEvoPeriodo(id){ evoPeriodo = id; renderEvolucion(); }
    ÚLTIMO día del periodo (el día de la final), tanto en el gráfico como en la
    probabilidad de ganar el pozo. Si el admin aún no cargó el campeón real, el
    botón queda visible pero avisa que todavía no suma nada. */
+/* Día de la FINAL (no la semifinal ni el 3er puesto) */
+function diaFinal(){
+  const sf = DIAS.filter(d=>d.fase==="SF");
+  return sf.find(d=>/\bfinal\b/i.test(d.et||"")) || sf.slice().sort((a,b)=> (b.fecha||"").localeCompare(a.fecha||""))[0] || null;
+}
+/* Campeón deducido del marcador de la final (para no depender de que el admin lo cargue) */
+function campeonDeLaFinal(){
+  const d = diaFinal(); if(!d) return "";
+  const sc = (DB.res?.[d.id]||[])[0];
+  const w  = avanzaDe(sc);
+  if(w!==0 && w!==1) return "";
+  return getPartidos(d.id)?.[0]?.[w] || "";
+}
+/* Guarda en la nube el campeón deducido, para que el Ranking general también lo cuente */
+async function fijarCampeonDesdeFinal(){
+  const c = campeonDeLaFinal();
+  if(!c){ toast("Aún no hay marcador de la final",true); return; }
+  DB.campeonReal = c;
+  const {error} = await sbUpsert("meta","campeonReal", c);
+  if(error){ toast("No se pudo guardar",true); return; }
+  setv("a-campeon", c);
+  toast("Campeón real: "+c);
+  renderRanking(); renderEvolucion();
+}
 function evoBonoCampeon(){
   const activo   = (evoPeriodo === "SF");
   const wrap     = document.getElementById("evo-camp-wrap");
@@ -1691,25 +1715,36 @@ function evoBonoCampeon(){
   const info     = document.getElementById("evo-camp-info");
   if(wrap) wrap.style.display = activo ? "inline-flex" : "none";
   if(sep)  sep.style.display  = activo ? "inline"     : "none";
-  const on   = activo && document.getElementById("evo-campeon")?.checked !== false;
-  const real = DB.campeonReal || "";
-  const camps= DB.campeones || {};
+  const on      = activo && document.getElementById("evo-campeon")?.checked !== false;
+  const oficial = DB.campeonReal || "";
+  const auto    = oficial ? "" : campeonDeLaFinal();       // respaldo: lo deduce del marcador de la final
+  const real    = oficial || auto;
+  const camps   = DB.campeones || {};
   const mapa = {};
   if(on && real) Object.keys(DB.preds||{}).forEach(n=>{ if(camps[n]===real) mapa[n]=PTS.campeon; });
   if(info){
     if(!activo){ info.style.display="none"; info.innerHTML=""; }
     else{
       info.style.display="block";
-      if(!real) info.innerHTML=`🏆 El <b>campeón real</b> todavía no está cargado, así que el bono aún no suma. Cuando el admin lo cargue en <b>Admin → Campeón real</b>, quien lo haya acertado sumará <b>+${PTS.campeon} pts</b> aquí.`;
-      else{
+      if(!real){
+        const df = diaFinal();
+        const sc = df ? (DB.res?.[df.id]||[])[0] : null;
+        info.innerHTML = (sc && sc[0]===sc[1])
+          ? `🏆 La final quedó <b>empatada ${sc[0]}-${sc[1]}</b> a los 90'. Falta marcar <b>quién ganó en penales</b> (en Resultados, el selector de clasificado) o cargar el campeón en <b>Admin → Campeón real</b> para que el bono de <b>+${PTS.campeon} pts</b> sume.`
+          : `🏆 Todavía no hay <b>campeón</b>: falta el marcador de la final (o cargarlo en <b>Admin → Campeón real</b>). Cuando exista, quien lo haya acertado sumará <b>+${PTS.campeon} pts</b> aquí.`;
+      } else {
         const ganan = Object.keys(mapa);
-        info.innerHTML = on
-          ? `🏆 Campeón real: <b>${evoEsc(real)}</b> · ${ganan.length? `suman +${PTS.campeon} pts: <b>${ganan.map(evoEsc).join(", ")}</b>` : `nadie lo acertó, el bono no cambia nada`}.`
-          : `🏆 Campeón real: <b>${evoEsc(real)}</b> · bono desactivado (marca la casilla para sumarlo).`;
+        const quien = on
+          ? (ganan.length ? `suman +${PTS.campeon} pts: <b>${ganan.map(evoEsc).join(", ")}</b>` : `nadie lo acertó, el bono no cambia nada`)
+          : `bono desactivado (marca la casilla para sumarlo)`;
+        const nota = auto
+          ? ` <i style="color:var(--muted)">(deducido del marcador de la final)</i>${adminOK?` <button class="mini sec" style="padding:1px 8px;font-size:.7rem;" onclick="fijarCampeonDesdeFinal()">Guardarlo como oficial</button>`:``}`
+          : ``;
+        info.innerHTML = `🏆 Campeón: <b>${evoEsc(real)}</b>${nota} · ${quien}.`;
       }
     }
   }
-  return { activo, on, real, mapa, de:(n)=> mapa[n]||0 };
+  return { activo, on, real, auto:!!auto, mapa, de:(n)=> mapa[n]||0 };
 }
 function renderEvoPeriodos(){
   const cont = document.getElementById("evo-periodos"); if(!cont) return;
