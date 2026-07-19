@@ -327,7 +327,12 @@
       <label style="display:inline-flex;align-items:center;gap:6px;font-size:.78rem;margin:0;">
         <input type="checkbox" id="evo-caritas" checked style="width:auto;margin:0;"> Mostrar caritas
       </label>
+      <span class="hint" id="evo-camp-sep" style="margin:0;display:none;">·</span>
+      <label id="evo-camp-wrap" style="display:none;align-items:center;gap:6px;font-size:.78rem;margin:0;padding:2px 8px;border:1px solid var(--accent);border-radius:8px;">
+        <input type="checkbox" id="evo-campeon" checked style="width:auto;margin:0;"> 🏆 Sumar bono campeón (+10)
+      </label>
     </div>
+    <p class="hint" id="evo-camp-info" style="margin:0 0 8px;display:none;"></p>
     <div id="evo-leyenda" class="evo-leyenda"></div>
     <div id="evo-chart-wrap" class="evo-chart-wrap"></div>
     <p class="hint" id="evo-nota" style="margin-top:8px;"></p>
@@ -1673,6 +1678,39 @@ function evoPeriodos(){
 }
 let evoPeriodo = "ALL";
 function pickEvoPeriodo(id){ evoPeriodo = id; renderEvolucion(); }
+/* ====== BONO CAMPEÓN (+10) EN LA FASE FINAL ======
+   El botón solo aparece en "Semis y Final": ahí se define el campeón del mundo.
+   Con el botón activo, quien acertó su campeón inicial suma PTS.campeon en el
+   ÚLTIMO día del periodo (el día de la final), tanto en el gráfico como en la
+   probabilidad de ganar el pozo. Si el admin aún no cargó el campeón real, el
+   botón queda visible pero avisa que todavía no suma nada. */
+function evoBonoCampeon(){
+  const activo   = (evoPeriodo === "SF");
+  const wrap     = document.getElementById("evo-camp-wrap");
+  const sep      = document.getElementById("evo-camp-sep");
+  const info     = document.getElementById("evo-camp-info");
+  if(wrap) wrap.style.display = activo ? "inline-flex" : "none";
+  if(sep)  sep.style.display  = activo ? "inline"     : "none";
+  const on   = activo && document.getElementById("evo-campeon")?.checked !== false;
+  const real = DB.campeonReal || "";
+  const camps= DB.campeones || {};
+  const mapa = {};
+  if(on && real) Object.keys(DB.preds||{}).forEach(n=>{ if(camps[n]===real) mapa[n]=PTS.campeon; });
+  if(info){
+    if(!activo){ info.style.display="none"; info.innerHTML=""; }
+    else{
+      info.style.display="block";
+      if(!real) info.innerHTML=`🏆 El <b>campeón real</b> todavía no está cargado, así que el bono aún no suma. Cuando el admin lo cargue en <b>Admin → Campeón real</b>, quien lo haya acertado sumará <b>+${PTS.campeon} pts</b> aquí.`;
+      else{
+        const ganan = Object.keys(mapa);
+        info.innerHTML = on
+          ? `🏆 Campeón real: <b>${evoEsc(real)}</b> · ${ganan.length? `suman +${PTS.campeon} pts: <b>${ganan.map(evoEsc).join(", ")}</b>` : `nadie lo acertó, el bono no cambia nada`}.`
+          : `🏆 Campeón real: <b>${evoEsc(real)}</b> · bono desactivado (marca la casilla para sumarlo).`;
+      }
+    }
+  }
+  return { activo, on, real, mapa, de:(n)=> mapa[n]||0 };
+}
 function renderEvoPeriodos(){
   const cont = document.getElementById("evo-periodos"); if(!cont) return;
   const res = DB.res||{};
@@ -1691,10 +1729,10 @@ function renderEvoPeriodos(){
    partido ya visto en el periodo (mismo reparto de la app). Así el líder no gana
    "seguro": si alguien está cerca aún puede alcanzarlo, y quien ya no puede
    matemáticamente sale con 0% -> "Gracias por participar". */
-function probGanarPeriodo(names, preds, res, per, diasConRes){
+function probGanarPeriodo(names, preds, res, per, diasConRes, bonos){
   const totals={}, pool=[];
   names.forEach(n=>{
-    let t=0;
+    let t=(bonos?.[n])||0;   // bono campeón (+10) si está activo: ya es puntaje seguro
     diasConRes.forEach(d=>{
       const rm=res[d.id]||[], pm=preds[n]?.[d.id];
       rm.forEach((r,i)=>{ if(!r) return; const p=puntosPartido(pm?.[i], r, d.fecha, d.id, i); t+=p; pool.push(p); });
@@ -1734,6 +1772,7 @@ function renderEvolucion(){
   if(!wrap) return;
   renderEvoPeriodos();
   renderEvoFotos();
+  const bono = evoBonoCampeon();          // {activo, on, real, de(nombre), mapa}
   const preds = DB.preds||{}, res = DB.res||{}, fotos = DB.caritas||{};
   const names = Object.keys(preds);
   if(!names.length){
@@ -1759,14 +1798,17 @@ function renderEvolucion(){
       run += r.pts;
       return acumular ? run : r.pts;
     });
-    return { n, idx, vals, total: vals[vals.length-1], color: evoColor(idx, names.length) };
+    // bono campeón: se agrega en el último día del periodo (el de la final)
+    const bn = bono.de(n);
+    if(bn) vals[vals.length-1] += bn;
+    return { n, idx, vals, total: vals[vals.length-1], bono: bn, color: evoColor(idx, names.length) };
   });
   // ordenar por valor final (para colocar caritas de mayor a menor)
   const orden = [...series].sort((a,b)=> b.total - a.total);
 
   // Probabilidad de ganar la fecha/fase seleccionada (no aplica a "Todo el torneo")
   const mostrarProb = (evoPeriodo !== "ALL");
-  const prob = mostrarProb ? probGanarPeriodo(names, preds, res, per, diasConRes) : null;
+  const prob = mostrarProb ? probGanarPeriodo(names, preds, res, per, diasConRes, bono.mapa) : null;
 
   // Geometría
   const N = diasConRes.length;
@@ -1857,7 +1899,7 @@ function renderEvolucion(){
       slots += `<circle cx="${colX}" cy="${cy.toFixed(1)}" r="5" fill="${s.color}" stroke="var(--bg)" stroke-width="1.5"/>`;
     }
     slots += `<text class="evo-name" x="${(colX+slotR+8).toFixed(1)}" y="${(cy-3).toFixed(1)}">${dj}</text>`;
-    slots += `<text class="evo-tot" x="${(colX+slotR+8).toFixed(1)}" y="${(cy+11).toFixed(1)}">${s.total} pts</text>`;
+    slots += `<text class="evo-tot" x="${(colX+slotR+8).toFixed(1)}" y="${(cy+11).toFixed(1)}">${s.total} pts${s.bono?` (🏆+${s.bono})`:""}</text>`;
     if(mostrarProb){
       const pr = Math.round(prob.prob[s.n] || 0);
       let probTxt, cero=false;
@@ -1879,7 +1921,8 @@ function renderEvolucion(){
       const et = prob.cerrada ? (pr>0?'🏆':'🙌 gracias') : (pr>0? pr+'%' : '🙌 gracias');
       extra = ` <b style="color:${pr>0?s.color:'var(--muted)'};font-weight:700;">· ${et}</b>`;
     }
-    return `<span class="chip"><span class="dot" style="background:${s.color}"></span>${evoEsc(s.n)} <b style="color:var(--muted);font-weight:600;">(${s.total})</b>${extra}</span>`;
+    const bn = s.bono? ` <b style="color:var(--accent);font-weight:700;">🏆+${s.bono}</b>` : "";
+    return `<span class="chip"><span class="dot" style="background:${s.color}"></span>${evoEsc(s.n)} <b style="color:var(--muted);font-weight:600;">(${s.total})</b>${bn}${extra}</span>`;
   }).join("");
   let colaProb = "";
   if(mostrarProb){
@@ -1887,7 +1930,10 @@ function renderEvolucion(){
       ? ` · <b>fecha cerrada</b> — el líder se lleva la polla`
       : ` · faltan <b>${prob.restantes}</b> partido${prob.restantes!==1?'s':''} · <b>probabilidad de ganar</b> estimada por simulación`;
   }
-  nota.innerHTML = `📅 <b>${per.et}</b> · ${N} día${N>1?'s':''} con resultados · ${acumular?'puntos acumulados':'puntos por día'}${colaProb}.`;
+  const colaBono = (bono.on && Object.keys(bono.mapa).length)
+    ? ` · 🏆 incluye el <b>bono campeón +${PTS.campeon}</b> (sumado en el último día)`
+    : "";
+  nota.innerHTML = `📅 <b>${per.et}</b> · ${N} día${N>1?'s':''} con resultados · ${acumular?'puntos acumulados':'puntos por día'}${colaBono}${colaProb}.`;
 }
 
 /* ====== FOTOS DE LAS CARITAS ====== */
@@ -2381,7 +2427,7 @@ document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{
   else if(t.dataset.p==="log") renderLog();
 });
 // recalcular el gráfico al cambiar las opciones
-["evo-acum","evo-caritas"].forEach(id=>{
+["evo-acum","evo-caritas","evo-campeon"].forEach(id=>{
   const el=document.getElementById(id);
   if(el) el.addEventListener("change", renderEvolucion);
 });
